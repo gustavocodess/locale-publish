@@ -1,4 +1,6 @@
 import { registerCommercePlugin as registerPlugin } from '@builder.io/commerce-plugin-tools';
+import { reaction } from 'mobx'
+import { Builder } from '@builder.io/sdk';
 import pkg from '../package.json';
 import appState from '@builder.io/app-context';
 
@@ -15,15 +17,17 @@ registerPlugin(
     id: pkg.name,
     settings: [
       {
-        name: 'private key',
+        name: 'privateKey',
         type: 'string',
+        required: true,
       },
     ],
     ctaText: `Connect your localization plugin`,
     noPreviewTypes: true,
   },
   async settings => {
-
+    const privateKey = settings.get('privateKey');
+    console.log('privateKey ', privateKey)
     registerEditorOnLoad(({ safeReaction }) => {
       safeReaction(
         () => {
@@ -77,7 +81,8 @@ registerPlugin(
     registerContentAction({
       label: `Publish for locale`,
       showIf(content, model) {
-        return true;
+        const locale = appState.designerState?.activeLocale || 'Default';
+        return locale !== 'Default';
       },
       async onClick(content) {
         const locale = appState.designerState?.activeLocale || 'Default';
@@ -89,18 +94,32 @@ registerPlugin(
 
         const draftBlocks = JSON.parse(draftContent?.data?.blocksString);
 
-
-        const liveContentBlockIds = liveContent?.data?.blocks.map(bl => bl.id);
+        let liveContentBlockIds = []
+        // verify if has content live, if not, just publish the draft content
+        // if has content live, just append blocks with hide if condition
+        if (liveContent?.published === 'published') {
+          liveContentBlockIds = liveContent?.data?.blocks.map(bl => bl.id);
+        } else {
+          liveContentBlockIds = draftBlocks.map(bl => bl.id);
+        }
 
         const blocksToPush = []
         draftBlocks.forEach(block => {
-          console.log('block.id', block.id, typeof block.id)
-          if (liveContentBlockIds.indexOf(block.id) < 0) {
+          if (liveContentBlockIds.indexOf(block.id) < 0 // case block is not in live content
+          || liveContent?.published === 'draft' // case there is no live content
+          ) {
             blocksToPush.push({
               ...block,
               bindings: {
                 ...block.bindings,
                 show: `var _virtual_index=\"${locale}\"===state.locale;return _virtual_index`
+              },
+              component: {
+                ...block.component,
+                options: {
+                  ...block.component.options,
+                  show: true,
+                }
               }
             });
           } else {
@@ -111,7 +130,8 @@ registerPlugin(
         const newContent = {
           data: {
             blocks: blocksToPush,
-          }
+          },
+          published: "published",
         }
 
         appState.globalState.showGlobalBlockingLoading(`Publishing for ${locale} ....`);
@@ -121,11 +141,7 @@ registerPlugin(
             method: 'PATCH',
             headers: {
               'Content-Type': 'application/json',
-              // 'Authorization': `Bearer bpk-eef5ff6388eb40fdb999c49fcb69514b`
-              // 'Authorization': `Bearer bpk-7a4e1daa16854d78a510e2eedabc06c2`
-              // 'Authorization': `Bearer bpk-ef4d429d8b054bc186d31aee47df2273`
-              // TODO: add your private key here
-              'Authorization': `Bearer TODO: add your private key here`
+              'Authorization': `Bearer ${privateKey}`
             },
             body: JSON.stringify(newContent),
           }
@@ -144,5 +160,3 @@ registerPlugin(
     return {};
   }
 );
-
-

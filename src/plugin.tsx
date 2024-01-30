@@ -9,7 +9,12 @@ import {
   registerContextMenuAction,
   fastClone,
   registerEditorOnLoad,
+  registerLocalesTab,
 } from './plugin-helpers';
+import { getLangPicks } from './snackbar-utils';
+import { pushToLocales } from './locale-helpers';
+
+let registerTab = false
 
 registerPlugin(
   {
@@ -27,17 +32,21 @@ registerPlugin(
   },
   async settings => {
     const privateKey = settings.get('privateKey');
-    console.log('privateKey ', privateKey)
+
     registerEditorOnLoad(({ safeReaction }) => {
       safeReaction(
         () => {
-          return true;
-        },
-        async shoudlCheck => {
-          if (!shoudlCheck) {
-            return;
+          const draftClone = fastClone(appState?.designerState?.editingContentModel);
+          const isGlobal = draftClone?.data?.isGlobal
+
+          if (isGlobal && !registerTab) {
+            // register only once flag
+            registerTab = true
+            registerLocalesTab(privateKey);
           }
-          
+          return draftClone;
+        },
+        async (content: any) => {        
         },
         {
           fireImmediately: true,
@@ -45,110 +54,34 @@ registerPlugin(
       );
     });
 
-    const transcludedMetaKey = 'excludeFromTranslation';
-    registerContextMenuAction({
-      label: 'Exclude from future translations',
-      showIf(selectedElements) {
-        if (selectedElements.length !== 1) {
-          // todo maybe apply for multiple
-          return false;
-        }
-        const element = selectedElements[0];
-        const isExcluded = element.meta?.get(transcludedMetaKey);
-        return !isExcluded;
-      },
-      onClick(elements) {
-        elements.forEach(el => el.meta.set('excludeFromTranslation', true));
-      },
-    });
-
-    registerContextMenuAction({
-      label: 'Include in future translations',
-      showIf(selectedElements) {
-        if (selectedElements.length !== 1) {
-          // todo maybe apply for multiple
-          return false;
-        }
-        const element = selectedElements[0];
-        const isExcluded = element.meta?.get(transcludedMetaKey);
-        return isExcluded;
-      },
-      onClick(elements) {
-        elements.forEach(el => el.meta.set('excludeFromTranslation', false));
-      },
-    });
-
     registerContentAction({
-      label: `Publish for locale`,
+      label: `Push for locale`,
       showIf(content, model) {
-        const locale = appState.designerState?.activeLocale || 'Default';
-        return locale !== 'Default';
+        // const locale = appState.designerState?.activeLocale || 'Default';
+        // return locale !== 'Default';
+        return true;
       },
       async onClick(content) {
         const locale = appState.designerState?.activeLocale || 'Default';
         const model = content.modelName;
-        const contentId = content.id;
 
-        const draftContent = fastClone(content);
-        const liveContent = (await fetch(`https://cdn.builder.io/api/v3/content/${model}/${content.id}?apiKey=${appState.user.apiKey}&staleCacheSeconds=1`).then(res => res.json()));
+        const localeChildren = fastClone(appState.designerState.editingContentModel?.data?.get("localeChildren")?? [])
 
-        const draftBlocks = JSON.parse(draftContent?.data?.blocksString);
+        const deployedLocales = localeChildren.map((locale: any) => locale?.target?.value[0])
 
-        let liveContentBlockIds = []
-        // verify if has content live, if not, just publish the draft content
-        // if has content live, just append blocks with hide if condition
-        if (liveContent?.published === 'published') {
-          liveContentBlockIds = liveContent?.data?.blocks.map(bl => bl.id);
-        } else {
-          liveContentBlockIds = draftBlocks.map(bl => bl.id);
+        const picks = await getLangPicks(deployedLocales);
+        const localesToPublish = picks?.targetLangs.map(e => e)
+        if (!picks || !localesToPublish) {
+          appState.globalState.hideGlobalBlockingLoading();
+          return;
         }
 
-        const blocksToPush = []
-        draftBlocks.forEach(block => {
-          if (liveContentBlockIds.indexOf(block.id) < 0 // case block is not in live content
-          || liveContent?.published === 'draft' // case there is no live content
-          ) {
-            blocksToPush.push({
-              ...block,
-              bindings: {
-                ...block.bindings,
-                show: `var _virtual_index=\"${locale}\"===state.locale;return _virtual_index`
-              },
-              component: {
-                ...block.component,
-                options: {
-                  ...block.component.options,
-                  show: true,
-                }
-              }
-            });
-          } else {
-            blocksToPush.push(block);
-          }
-        })
-        
-        const newContent = {
-          data: {
-            blocks: blocksToPush,
-          },
-          published: "published",
-        }
+        appState.globalState.showGlobalBlockingLoading(`Publishing for ${localesToPublish.join(' & ')} ....`);
+        const success = await pushToLocales(localesToPublish, fastClone(content), privateKey);
 
-        appState.globalState.showGlobalBlockingLoading(`Publishing for ${locale} ....`);
-        const resultStatus = await fetch(
-          `https://builder.io/api/v1/write/${model}/${contentId}?apiKey=${appState.user.apiKey}&cachebust=true`,
-          {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${privateKey}`
-            },
-            body: JSON.stringify(newContent),
-          }
-        ).then(res => res.status);
-
-        if (resultStatus === 200) {
-          appState.snackBar.show(`Published content for ${locale}.`);
+        if (success) {
+          appState.snackBar.show(`Published content for ${localesToPublish.join(' & ')}.`);
+          // update parent with children references created
         } else {
           appState.snackBar.show(`Error publishing for ${locale}. Contact Admin.`);
         }
@@ -156,7 +89,6 @@ registerPlugin(
         }
       },
     );
-
     return {};
   }
 );

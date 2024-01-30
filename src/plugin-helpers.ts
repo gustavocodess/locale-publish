@@ -1,5 +1,9 @@
 import { Builder } from '@builder.io/react';
 import * as React from 'react';
+import {
+  Language,
+} from '@material-ui/icons';
+import LocalesTab from './locales-tab';
 export type BulkAction = {
   label: string;
   showIf(selectedContentIds: string[], content: any[], model: any): Boolean;
@@ -37,6 +41,15 @@ export function registerContextMenuAction(contextMenuAction: ContextMenuAction) 
 
 export function registerEditorOnLoad(reactionCallback: (actions: ContentEditorActions) => void) {
   Builder.register('editor.onLoad', reactionCallback);
+}
+
+export function registerLocalesTab(privateKey: string) {
+  Builder.register('editor.editTab', {
+    name: 'Locales',
+    // TODO: check if possible adding icon (as per docs, only on umg?)
+    // icon: () => <Language />,
+    component: () => LocalesTab({privateKey}),
+  })
 }
 
 interface ContentEditorActions {

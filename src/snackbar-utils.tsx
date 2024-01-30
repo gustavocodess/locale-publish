@@ -79,6 +79,7 @@ export function showOutdatedNotifications(callback: () => void) {
 
 interface Props {
   onChoose: (val: { sourceLang: string; targetLangs: string[] } | null) => void;
+  deployedLocales: string[];
 }
 const lsKey = 'phrase.sourceLang';
 
@@ -106,7 +107,8 @@ const PhraseConfigurationEditor: React.FC<Props> = props => {
         appState.user.organization.value.customTargetingAttributes
           ?.get('locale')
           ?.toJSON()
-          .enum?.filter((locale: string) => locale !== store.sourceLang) || []
+          .enum?.filter((locale: string) => locale !== store.sourceLang)
+          .filter((item: string) => !props.deployedLocales.includes(item)) || []
       );
     },
     sourceLang:
@@ -116,30 +118,8 @@ const PhraseConfigurationEditor: React.FC<Props> = props => {
 
   return useObserver(() => (
     <div css={{ margin: 20 }}>
-      <div>
-        <Typography>Source Language*</Typography>
-        <Select
-          fullWidth
-          value={store.sourceLang}
-          renderValue={() => store.sourceLang}
-          onChange={action(event => {
-            store.sourceLang = event.target.value;
-            store.targetLangs = store.targetLangs.filter(locale => locale !== store.sourceLang);
-            safeLsSet(lsKey, store.sourceLang);
-          })}
-        >
-          {[store.sourceLang].concat(store.availableLangs).map(locale => (
-            <MenuItem key={locale} value={locale}>
-              <Radio color="primary" checked={store.sourceLang === locale} />
-
-              <ListItemText primary={locale} />
-            </MenuItem>
-          ))}
-        </Select>
-
-        <Typography css={{ marginBottom: 15, marginTop: 10 }} variant="caption">
-          Pick from the list of available languages
-        </Typography>
+      <div css={{ marginTop: 8, marginBottom: 20 }}>
+        <Typography css={{fontWeight: 'bold', fontSize: 16 }}>Pick languages for push</Typography>
       </div>
       <div>
         <Typography>Target Languages*</Typography>
@@ -153,42 +133,36 @@ const PhraseConfigurationEditor: React.FC<Props> = props => {
             store.targetLangs = [...event.target.value];
           })}
         >
-          {store.sourceLang ? (
+          {
             store.availableLangs.map(locale => (
               <MenuItem key={locale} value={locale}>
                 <Checkbox color="primary" checked={store.targetLangs.includes(locale)} />
-
                 <ListItemText primary={locale} />
               </MenuItem>
             ))
-          ) : (
-            <Typography>Pick a source language first</Typography>
-          )}
+          }
         </Select>
-
-        <Typography css={{ marginBottom: 15, marginTop: 10 }} variant="caption">
-          Pick from the list of available languages
-        </Typography>
       </div>
       <DialogActions>
         <Button onClick={() => props.onChoose(null)} color="default">
-          cancel
+          Cancel
         </Button>
         <Button variant="contained" onClick={() => props.onChoose(store)} color="primary">
-          Translate
+          Create Locales
         </Button>
       </DialogActions>
     </div>
   ));
 };
 
-export async function getLangPicks(): Promise<{
+export async function getLangPicks(deployedLocales: string[]): Promise<{
   sourceLang: string;
   targetLangs: string[];
 } | null> {
   return new Promise(async resolve => {
     const destroy = await appState.globalState.openDialog(
       React.createElement(PhraseConfigurationEditor, {
+        deployedLocales: deployedLocales,
         onChoose: val => {
           resolve(val);
           destroy();

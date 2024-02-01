@@ -63,7 +63,7 @@ registerPlugin(
       },
       async onClick(content) {
         const locale = appState.designerState?.activeLocale || 'Default';
-        const model = content.modelName;
+        const modelName = content.modelName;
 
         const localeChildren = fastClone(appState.designerState.editingContentModel?.data?.get("localeChildren")?? [])
 
@@ -77,7 +77,7 @@ registerPlugin(
         }
 
         appState.globalState.showGlobalBlockingLoading(`Publishing for ${localesToPublish.join(' & ')} ....`);
-        const success = await pushToLocales(localesToPublish, fastClone(content), privateKey);
+        const success = await pushToLocales(localesToPublish, fastClone(content), privateKey, modelName);
 
         if (success) {
           appState.snackBar.show(`Published content for ${localesToPublish.join(' & ')}.`);

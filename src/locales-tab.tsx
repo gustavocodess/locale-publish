@@ -3,7 +3,6 @@ import {
   Button,
 } from '@material-ui/core';
 import appState from '@builder.io/app-context';
-// import { updateChildren, updateParent } from './locale-service';
 import { updateSingleLocale } from './locale-helpers';
 import LocaleItem from './locale-item';
 import { fastClone } from './plugin-helpers';
@@ -17,6 +16,7 @@ const LocalesTab = (props: Props) => {
   const currentContent = fastClone(appState?.designerState?.editingContentModel)
   const localeChildren = currentContent?.data?.localeChildren?? []
   const parentId = currentContent?.id
+  const modelName = appState?.designerState?.editingModel?.name
 
   const apiKey = fastClone(appState?.user?.apiKey)
 
@@ -40,7 +40,7 @@ const LocalesTab = (props: Props) => {
 
 
   const handlePushChanges = async (childrenId: string) => {
-    const result = await updateSingleLocale(childrenId, parentId, privateKey, apiKey)
+    const result = await updateSingleLocale(childrenId, parentId, privateKey, apiKey, modelName)
     if (result.status === 200) {
       appState?.snackBar.show(`Suceessfully updated ${childrenId} with new blocks`);
     }
@@ -48,7 +48,7 @@ const LocalesTab = (props: Props) => {
 
   const handlePushBatchChanges = async () => {
     appState.globalState.showGlobalBlockingLoading(`Pushing changes for ${localeChildren.map((locale: any) => locale?.target?.value[0]).join(' & ')} ....`);
-    const results = localeChildren.map(async (locale: any) => await updateSingleLocale(locale?.reference?.id, parentId, privateKey, apiKey))
+    const results = localeChildren.map(async (locale: any) => await updateSingleLocale(locale?.reference?.id, parentId, privateKey, apiKey, modelName))
     const final = await Promise.all(results)
     await appState.globalState.hideGlobalBlockingLoading();
 

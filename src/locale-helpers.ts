@@ -1,8 +1,8 @@
 import { pushLocale, updateChildren } from "./locale-service";
 
-export async function updateSingleLocale(chidrenId: string, parentId: string, privateKey: string, apiKey: string) {
-  const masterContent = await (await fetch(`https://cdn.builder.io/api/v3/content/page/${parentId}?apiKey=${apiKey}&cachebust=true`)).json();
-  const childrenContent = await (await fetch(`https://cdn.builder.io/api/v3/content/page/${chidrenId}?apiKey=${apiKey}&cachebust=true&includeUnpublished=true`)).json();
+export async function updateSingleLocale(chidrenId: string, parentId: string, privateKey: string, apiKey: string, modelName: string) {
+  const masterContent = await (await fetch(`https://cdn.builder.io/api/v3/content/${modelName}/${parentId}?apiKey=${apiKey}&cachebust=true`)).json();
+  const childrenContent = await (await fetch(`https://cdn.builder.io/api/v3/content/${modelName}/${chidrenId}?apiKey=${apiKey}&cachebust=true&includeUnpublished=true`)).json();
 
   const childrenContentBlocks = (childrenContent?.data?.blocks?? []).filter((block: any) => !block?.id.includes('pixel'))
   const masterBlocks = (masterContent?.data?.blocks?? []).filter((block: any) => !block?.id.includes('pixel'))
@@ -25,12 +25,12 @@ export async function updateSingleLocale(chidrenId: string, parentId: string, pr
     }
   })
   // call write API to update the children with new blocks
-  const result = await updateChildren(chidrenId, privateKey, finalBlocks)
+  const result = await updateChildren(chidrenId, privateKey, finalBlocks, modelName)
   return result;
 }
 
 
-export async function pushToLocales(localesToPublish: string[], cloneContent: any, privateKey: string) {
+export async function pushToLocales(localesToPublish: string[], cloneContent: any, privateKey: string, modelName: string) {
 
   const newBlocks = (JSON.parse(cloneContent?.data?.blocksString)?? []).map((block: any) => ({...block, meta: {...block.meta, masterId: block.id}}));
   const createdEntries: any[] = []
@@ -52,7 +52,7 @@ export async function pushToLocales(localesToPublish: string[], cloneContent: an
         // adding parent for reference from Global Master
         parent: {
           "@type": "@builder.io/core:Reference",
-          "model": "page",
+          "model": modelName,
           "id": cloneContent.id,
         },
         isGlobal: false,
@@ -60,7 +60,8 @@ export async function pushToLocales(localesToPublish: string[], cloneContent: an
       name: `local for ${cloneContent.name} - ${locale}`,
       published: 'draft',
       query: [
-        ...cloneContent.query,
+        //remove locales from global in case there is any: should not go to local page
+        ...cloneContent.query.filter((query: any) => query?.property !== 'locale'),
         {
           ...localeTarget,
         }
@@ -68,7 +69,7 @@ export async function pushToLocales(localesToPublish: string[], cloneContent: an
     }
     delete newContent.id;
 
-    const result = await pushLocale(newContent, privateKey);
+    const result = await pushLocale(newContent, privateKey, modelName);
     const entryCreated = await result.json();
     // console.log('entries created', entryCreated.id)
 
@@ -81,13 +82,13 @@ export async function pushToLocales(localesToPublish: string[], cloneContent: an
           name: item.name,
           reference: {
             "@type": "@builder.io/core:Reference",
-            "model": "page",
+            "model": modelName,
             "id": item.id,
           },
           target: item.target
         }))
       ]
-      const resUpdatedParent = await updateParentWithReferences(cloneContent, newLocaleReferences, privateKey)
+      const resUpdatedParent = await updateParentWithReferences(cloneContent, newLocaleReferences, privateKey, modelName)
       console.log('res parent ', resUpdatedParent.status)
     }
     return result;
@@ -99,10 +100,10 @@ export async function pushToLocales(localesToPublish: string[], cloneContent: an
 
 }
 
-export async function updateParentWithReferences(parentContent: any, newLocaleReferences: any[], privateKey: string) {
+export async function updateParentWithReferences(parentContent: any, newLocaleReferences: any[], privateKey: string, modelName: string) {
   // UPDATE current content with children references
   return await fetch(
-    `https://builder.io/api/v1/write/page/${parentContent.id}`,
+    `https://builder.io/api/v1/write/${modelName}/${parentContent.id}`,
     {
       method: 'PATCH',
       headers: {

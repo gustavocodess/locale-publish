@@ -30,6 +30,42 @@ export async function updateSingleLocale(chidrenId: string, parentId: string, pr
 }
 
 
+export async function updateSelectedElements(chidrenId: string, masterClone: any, privateKey: string, apiKey: string, modelName: string, elementToUpdate: any) {
+  const childrenContent = await (await fetch(`https://cdn.builder.io/api/v3/content/${modelName}/${chidrenId}?apiKey=${apiKey}&cachebust=true&includeUnpublished=true`)).json();
+
+  const childrenContentBlocks = (childrenContent?.data?.blocks?? []).filter((block: any) => !block?.id.includes('pixel'))
+  const masterBlocks = (JSON.parse(masterClone?.data?.blocksString)).filter((block: any) => !block?.id.includes('pixel'))
+
+  const childrenMap = <any>{}
+  childrenContentBlocks.forEach((block: any) => {
+    childrenMap[block.id] =  true
+  })
+
+  if (childrenMap[elementToUpdate?.id]) {
+    // it means the element already exists on children, so update content
+    let finalBlocks = [...childrenContentBlocks.map((block: any) => (block))]
+    const elementIndex = childrenContentBlocks.findIndex((block: any) => block.id === elementToUpdate?.id)
+    // TODO: instead of updating whole element, preserve existing translations on existing children (if exist)
+    finalBlocks[elementIndex] = elementToUpdate
+    return (await updateChildren(chidrenId, privateKey, finalBlocks, modelName))?.ok
+  }
+
+  // ELSE: IN CASE NEW ELEMENT DOESNT EXIST ON CHILDREN CONTENT
+  const newElementsToPush = [{...elementToUpdate, meta: { ...elementToUpdate.meta, masterId: masterClone?.id }}]
+  // index to insert new element on children content
+  const anchorIndex = masterBlocks.findIndex((block: any) => block.id === elementToUpdate?.id)
+
+  // creating final blocks first based on children content only
+  let finalBlocks = [...childrenContentBlocks.map((block: any) => (block))]
+
+  finalBlocks = [
+    ...finalBlocks.slice(0, anchorIndex),
+    ...newElementsToPush,
+    ...finalBlocks.slice(anchorIndex),
+  ]
+  return (await updateChildren(chidrenId, privateKey, finalBlocks, modelName))?.ok
+}
+
 export async function pushToLocales(localesToPublish: string[], cloneContent: any, privateKey: string, modelName: string) {
 
   const newBlocks = (JSON.parse(cloneContent?.data?.blocksString)?? []).map((block: any) => ({...block, meta: {...block.meta, masterId: block.id}}));

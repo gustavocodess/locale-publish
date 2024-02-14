@@ -95,8 +95,9 @@ registerPlugin(
       label: 'Push Component for Locales',
       showIf(selectedElements) {
         if (selectedElements.length === 1) {
+          const isGlobal = appState?.designerState?.editingContentModel?.data?.get("isGlobal");
           // todo: maybe apply for multiple??
-          return true;
+          return isGlobal;
         }
         return false;
       },

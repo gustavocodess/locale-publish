@@ -20,6 +20,8 @@ interface Props {
 
 const LocaleItem = (props: Props) => {
   const { item, onPush } = props
+  if (!item || !item?.reference) return null
+
   return (
     <div style={{ margin: 8 }} key={`item-${item.reference.id}`}>
       <Divider />

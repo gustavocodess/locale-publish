@@ -50,6 +50,8 @@ export function registerLocalesTab(privateKey: string) {
     // icon: () => <Language />,
     component: () => LocalesTab({privateKey}),
   })
+
+  console.log('Builder registry after ', Builder.registry)
 }
 
 interface ContentEditorActions {

@@ -100,7 +100,7 @@ const safeLsSet = (key: string, value: string) => {
   }
 };
 
-const PhraseConfigurationEditor: React.FC<Props> = props => {
+const LocaleConfigurationEditor: React.FC<Props> = props => {
   const store = useLocalStore(() => ({
     targetLangs: [] as string[],
     get availableLangs(): string[] {
@@ -135,7 +135,7 @@ const PhraseConfigurationEditor: React.FC<Props> = props => {
           })}
         >
           {
-            store.availableLangs.map(locale => (
+            store.availableLangs.sort().map(locale => (
               <MenuItem key={locale} value={locale}>
                 <Checkbox color="primary" checked={store.targetLangs.includes(locale)} />
                 <ListItemText primary={locale} />
@@ -223,7 +223,7 @@ export async function getLangPicks(deployedLocales: string[]): Promise<{
 } | null> {
   return new Promise(async resolve => {
     const destroy = await appState.globalState.openDialog(
-      React.createElement(PhraseConfigurationEditor, {
+      React.createElement(LocaleConfigurationEditor, {
         deployedLocales: deployedLocales,
         onChoose: val => {
           resolve(val);

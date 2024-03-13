@@ -1,6 +1,6 @@
 import { registerCommercePlugin as registerPlugin } from '@builder.io/commerce-plugin-tools';
 import { reaction } from 'mobx'
-import { Builder } from '@builder.io/sdk';
+import { Builder } from '@builder.io/react';
 import pkg from '../package.json';
 import appState from '@builder.io/app-context';
 
@@ -38,15 +38,17 @@ registerPlugin(
         () => {
           const draftClone = fastClone(appState?.designerState?.editingContentModel);
           const isGlobal = draftClone?.data?.isGlobal
-
-          if (isGlobal && !registerTab) {
-            // register only once flag
-            registerTab = true
+          if (!isGlobal) {
+            delete Builder.registry['editor.editTab']
+          } else if (isGlobal && !Builder.registry['editor.editTab']) {
             registerLocalesTab(privateKey);
           }
+
           return draftClone;
         },
-        async (content: any) => {        
+        async (content: any) => {
+          return false;
+
         },
         {
           fireImmediately: true,
@@ -57,9 +59,8 @@ registerPlugin(
     registerContentAction({
       label: `Push for locale`,
       showIf(content, model) {
-        // const locale = appState.designerState?.activeLocale || 'Default';
-        // return locale !== 'Default';
-        return true;
+        const isGlobal = fastClone(content?.data)?.isGlobal
+        return isGlobal;
       },
       async onClick(content) {
         const locale = appState.designerState?.activeLocale || 'Default';
@@ -74,6 +75,13 @@ registerPlugin(
         if (!picks || !localesToPublish) {
           appState.globalState.hideGlobalBlockingLoading();
           return;
+        }
+
+        const clone = fastClone(content)?.data?.blocksString || null
+        const newBlocks = (JSON.parse(clone)?? []).map((block: any) => ({...block, meta: {...block.meta, masterId: block.id}}));
+        if (!newBlocks || !newBlocks.length) {
+          appState.snackBar.show(`No content to push, please have at least one element before pushing.`);
+          return 
         }
 
         appState.globalState.showGlobalBlockingLoading(`Publishing for ${localesToPublish.join(' & ')} ....`);
@@ -111,6 +119,7 @@ registerPlugin(
         if (!picks?.targetLangs?.length) {
           return;
         }
+
         const masterClone = fastClone(appState.designerState.editingContentModel)
         const apiKey = fastClone(appState?.user?.apiKey)
         appState.globalState.showGlobalBlockingLoading(`Publishing for ${picks?.targetLangs.join(' & ')} ....`);
@@ -120,7 +129,7 @@ registerPlugin(
           localeMap[children?.target?.value[0]] = children
         })
         const updates: any[]= []
-        picks?.targetLangs?.map(async (pick: any, index: number) => {
+        picks?.targetLangs?.map(async (pick: any) => {
           const childrenId = localeMap[pick]?.reference?.id
           const childrenModel = localeMap[pick]?.reference?.model
           updates.push(updateSelectedElements(childrenId, masterClone, privateKey, apiKey, childrenModel, elements[0]))

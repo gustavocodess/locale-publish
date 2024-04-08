@@ -14,6 +14,7 @@ import {
   Button,
   Radio,
 } from '@material-ui/core';
+import { getLocaleOptionsForRole } from './locale-helpers';
 
 
 export function showPublishedNotification(locale: string, callback?: () => void) {
@@ -80,6 +81,7 @@ export function showOutdatedNotifications(callback: () => void) {
 interface Props {
   onChoose: (val: { sourceLang: string; targetLangs: string[] } | null) => void;
   deployedLocales: string[];
+  currentLocaleTargets: string[];
   elementsLength?: number;
 }
 const lsKey = 'phrase.sourceLang';
@@ -104,12 +106,14 @@ const LocaleConfigurationEditor: React.FC<Props> = props => {
   const store = useLocalStore(() => ({
     targetLangs: [] as string[],
     get availableLangs(): string[] {
+      const allowedLocales = getLocaleOptionsForRole().map((item: any) => item.value);
       return (
-        appState.user.organization.value.customTargetingAttributes
-          ?.get('locale')
-          ?.toJSON()
-          .enum?.filter((locale: string) => locale !== store.sourceLang)
-          .filter((item: string) => !props.deployedLocales.includes(item)) || []
+        allowedLocales
+        // appState.user.organization.value.customTargetingAttributes
+        //   ?.get('locale')
+        //   ?.toJSON()
+        //   .enum?.filter((locale: string) => locale !== store.sourceLang)
+          .filter((item: string) => !props.deployedLocales.includes(item) && !props.currentLocaleTargets.includes(item)) || []
       );
     },
     sourceLang:
@@ -161,12 +165,14 @@ const ElementConfigurationEditor: React.FC<Props> = props => {
     all: false,
     targetLangs: [] as string[],
     get availableLangs(): string[] {
+      const allowedLocales = getLocaleOptionsForRole().map((item: any) => item.value);
       return (
-        appState.user.organization.value.customTargetingAttributes
-          ?.get('locale')
-          ?.toJSON()
-          .enum?.filter((locale: string) => locale !== store.sourceLang)
-          .filter((item: string) => props.deployedLocales.includes(item)) || []
+        allowedLocales
+        // appState.user.organization.value.customTargetingAttributes
+        //   ?.get('locale')
+        //   ?.toJSON()
+        //   .enum?.filter((locale: string) => locale !== store.sourceLang)
+          .filter((item: string) => !props.deployedLocales.includes(item) && !props.currentLocaleTargets.includes(item)) || []
       );
     },
     sourceLang:
@@ -217,7 +223,7 @@ const ElementConfigurationEditor: React.FC<Props> = props => {
   ));
 };
 
-export async function getLangPicks(deployedLocales: string[]): Promise<{
+export async function getLangPicks(deployedLocales: string[], currentLocaleTargets: string[]): Promise<{
   sourceLang: string;
   targetLangs: string[];
 } | null> {
@@ -225,6 +231,7 @@ export async function getLangPicks(deployedLocales: string[]): Promise<{
     const destroy = await appState.globalState.openDialog(
       React.createElement(LocaleConfigurationEditor, {
         deployedLocales: deployedLocales,
+        currentLocaleTargets: currentLocaleTargets,
         onChoose: val => {
           resolve(val);
           destroy();
@@ -238,7 +245,7 @@ export async function getLangPicks(deployedLocales: string[]): Promise<{
 }
 
 
-export async function getLangsPushElement(deployedLocales: string[], elementsLength: number): Promise<{
+export async function getLangsPushElement(deployedLocales: string[], currentLocaleTargets: string[], elementsLength: number): Promise<{
   sourceLang: string;
   targetLangs: string[];
 } | null> {
@@ -247,6 +254,7 @@ export async function getLangsPushElement(deployedLocales: string[], elementsLen
       React.createElement(ElementConfigurationEditor, {
         elementsLength,
         deployedLocales: deployedLocales,
+        currentLocaleTargets: currentLocaleTargets,
         onChoose: val => {
           resolve(val);
           destroy();

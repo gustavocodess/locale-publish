@@ -10,9 +10,10 @@ import {
   fastClone,
   registerEditorOnLoad,
   registerLocalesTab,
+  getQueryLocales,
 } from './plugin-helpers';
 import { getLangPicks, getLangsPushElement } from './snackbar-utils';
-import { pushToLocales, updateSelectedElements } from './locale-helpers';
+import { getLocaleOptionsForRole, pushToLocales, updateSelectedElements } from './locale-helpers';
 
 let registerTab = false
 
@@ -37,6 +38,7 @@ registerPlugin(
       safeReaction(
         () => {
           const draftClone = fastClone(appState?.designerState?.editingContentModel);
+
           const isGlobal = draftClone?.data?.isGlobal
           if (!isGlobal) {
             delete Builder.registry['editor.editTab']
@@ -69,8 +71,10 @@ registerPlugin(
         const localeChildren = fastClone(appState.designerState.editingContentModel?.data?.get("localeChildren")?? [])
 
         const deployedLocales = localeChildren.map((locale: any) => locale?.target?.value[0])
+        
+        const currentLocaleTargets = getQueryLocales(appState?.designerState?.editingContentModel)
 
-        const picks = await getLangPicks(deployedLocales);
+        const picks = await getLangPicks(deployedLocales, currentLocaleTargets);
         const localesToPublish = picks?.targetLangs.map(e => e)
         if (!picks || !localesToPublish) {
           appState.globalState.hideGlobalBlockingLoading();

@@ -1,4 +1,4 @@
-import { Builder } from '@builder.io/react';
+import { Builder, BuilderContent } from '@builder.io/react';
 import * as React from 'react';
 import {
   Language,
@@ -50,8 +50,13 @@ export function registerLocalesTab(privateKey: string) {
     // icon: () => <Language />,
     component: () => LocalesTab({privateKey}),
   })
+}
 
-  console.log('Builder registry after ', Builder.registry)
+export function getQueryLocales(content: any) {
+  if (!content) return []
+  const queries = fastClone(content ?? {})?.query?.filter((item: any) => item?.property === 'locale')
+  const locales = queries.map((queryItem: any) => queryItem?.value.join())
+  return locales.join()?.split(",")
 }
 
 interface ContentEditorActions {

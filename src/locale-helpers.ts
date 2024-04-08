@@ -1,4 +1,5 @@
 import traverse from "traverse";
+import appState from '@builder.io/app-context';
 import { pushLocale, updateChildren } from "./locale-service";
 import { fastClone } from "./plugin-helpers";
 
@@ -147,7 +148,6 @@ export async function pushToLocales(localesToPublish: string[], cloneContent: an
       data: {
         ...cloneContent.data,
         blocks: newBlocks,
-        title: `${cloneContent.name} - ${locale}`,
         // adding parent for reference from Global Master
         parent: {
           "@type": "@builder.io/core:Reference",
@@ -220,3 +220,63 @@ export async function updateParentWithReferences(parentContent: any, newLocaleRe
     }
   ).then(res => res);
 }
+
+
+export const DEFAULT_LOCALE_VALUE = 'Default';
+
+export const getAllowedLocalesForUserRole = () => {
+  const userRole = appState.user.roleInfo;
+
+  if (userRole?.locales?.canEditAllLocales) {
+    return [DEFAULT_LOCALE_VALUE, ...getLocaleOptions()];
+  } else if (userRole?.locales?.allowedLocalesEditList?.length) {
+    return [...userRole?.locales?.allowedLocalesEditList];
+  }
+
+  return [];
+};
+
+export const getLocaleOptions = (): string[] => [
+  ...(appState.user.organization?.value.customTargetingAttributes.get('locale')?.get('enum') || []),
+];
+const LOCALE_PERMISSIONS_LAUNCH_DARKLY_FLAG = 'locale-permissions';
+export function isLocalePermissionsFeatureEnabled(user: any) {
+  return (
+    user.features.has('customTargeting') &&
+    appState.user.isEnterprise &&
+    appState.hasFeatureFlag(LOCALE_PERMISSIONS_LAUNCH_DARKLY_FLAG)
+  );
+}
+
+export function hasAccessToLocale({ role, locale }: { role: any; locale: string }) {
+  // if locale permissions feature itself is disabled for this org,
+  // then allow everything as before
+  if (!isLocalePermissionsFeatureEnabled(appState.user)) {
+    return true;
+  }
+
+  // a fail safe, in case the new locales property is
+  // NOT available on 'role' mobx model, then allow as before
+  if (role && !role.locales) {
+    return true;
+  }
+
+  return (
+    role && (role.locales.canEditAllLocales || role.locales.allowedLocalesEditList.includes(locale))
+  );
+}
+
+export const getLocalesForRole = (): string[] => {
+  return [DEFAULT_LOCALE_VALUE].concat(getLocaleOptions()).filter(locale =>
+    hasAccessToLocale({
+      role: appState.user.roleInfo,
+      locale,
+    })
+  );
+};
+
+export const getLocaleOptionsForRole = () =>
+  getLocalesForRole().map((locale: string) => ({
+    label: locale,
+    value: locale,
+  }));

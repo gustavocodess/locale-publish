@@ -4,6 +4,7 @@ import {
   Language,
 } from '@material-ui/icons';
 import LocalesTab from './locales-tab';
+import { Tooltip } from '@material-ui/core';
 export type BulkAction = {
   label: string;
   showIf(selectedContentIds: string[], content: any[], model: any): Boolean;
@@ -45,9 +46,11 @@ export function registerEditorOnLoad(reactionCallback: (actions: ContentEditorAc
 
 export function registerLocalesTab(privateKey: string) {
   Builder.register('editor.editTab', {
-    name: 'Locales',
-    // TODO: check if possible adding icon (as per docs, only on umg?)
-    // icon: () => <Language />,
+    name: (
+      <Tooltip title="Locales">
+        <Language style={{ fontSize: 20, marginRight: 6 }} />
+      </Tooltip>
+    ),
     component: () => LocalesTab({privateKey}),
   })
 }

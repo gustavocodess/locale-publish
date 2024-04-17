@@ -118,6 +118,9 @@ registerPlugin(
         const localeChildren = fastClone(appState.designerState.editingContentModel?.data?.get("localeChildren")?? [])
 
         const deployedLocales = localeChildren.map((locale: any) => locale?.target?.value[0])
+        const currentLocaleTargets = getQueryLocales(appState?.designerState?.editingContentModel)
+        console.log('currentLocaleTargets ', currentLocaleTargets)
+
         const picks = await getLangsPushElement(deployedLocales, elements.length);
 
         if (!picks?.targetLangs?.length) {
@@ -133,9 +136,11 @@ registerPlugin(
           localeMap[children?.target?.value[0]] = children
         })
         const updates: any[]= []
+        console.log('localeMap ', localeMap)
         picks?.targetLangs?.map(async (pick: any) => {
           const childrenId = localeMap[pick]?.reference?.id
           const childrenModel = localeMap[pick]?.reference?.model
+          console.log('updatind... ', childrenId, masterClone?.id)
           updates.push(updateSelectedElements(childrenId, masterClone, privateKey, apiKey, childrenModel, elements[0]))
         })
 

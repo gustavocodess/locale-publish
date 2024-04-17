@@ -23,7 +23,7 @@ const LocaleItem = (props: Props) => {
   if (!item || !item?.reference) return null
 
   return (
-    <div style={{ margin: 8 }} key={`item-${item.reference.id}`}>
+    <div style={{ margin: 8 }} key={`item-${item?.reference?.id}`}>
       <Divider />
       <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
         <Typography style={{ fontSize: 16 }}>
@@ -31,7 +31,7 @@ const LocaleItem = (props: Props) => {
         </Typography>
         <Typography style={{ fontSize: 13, fontWeight: 'bold' }}>
           <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center' }}>
-            <Language style={{ opacity: 0.5, fontSize: 14, marginRight: 6 }} /> {item.target.value[0]}
+            <Language style={{ opacity: 0.5, fontSize: 14, marginRight: 6 }} /> {item?.target?.value[0]}
           </div>
         </Typography>
 
@@ -41,7 +41,7 @@ const LocaleItem = (props: Props) => {
           <Tooltip enterDelay={100} title="View local page" placement="left">
             <IconButton
               css={{ position: 'absolute', top: 0, right: 0 }}
-              onClick={() => window.open(`https://builder.io/content/${item.reference.id}`, '_blank')}
+              onClick={() => window.open(`https://builder.io/content/${item?.reference?.id}`, '_blank')}
             >
             <RemoveRedEye css={{ opacity: 0.7, fontSize: 20 }} />
           </IconButton>
@@ -49,21 +49,21 @@ const LocaleItem = (props: Props) => {
           <Tooltip enterDelay={100} title="Push to this local" placement="left">
             <IconButton
               css={{ position: 'absolute', top: 0, right: 0 }}
-              onClick={() =>  onPush(item.reference.id)}
+              onClick={() =>  onPush(item?.reference?.id)}
             >
               <Publish css={{ opacity: 0.7, fontSize: 20 }} />
             </IconButton>
           </Tooltip>
         </div>
 
-        <Tooltip enterDelay={100} title="Compare content" placement="left">
+        {/* <Tooltip enterDelay={100} title="Compare content" placement="left">
           <IconButton
             css={{ position: 'absolute', top: 0, right: 0 }}
             onClick={() =>  {}}
           >
             <Code css={{ opacity: 0.7, fontSize: 20 }} />
           </IconButton>
-        </Tooltip>
+        </Tooltip> */}
         
       </div>
     </div>

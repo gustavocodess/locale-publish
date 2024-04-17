@@ -84,6 +84,12 @@ interface Props {
   currentLocaleTargets: string[];
   elementsLength?: number;
 }
+
+interface ElementProps {
+  onChoose: (val: { sourceLang: string; targetLangs: string[] } | null) => void;
+  deployedLocales: string[];
+  elementsLength?: number;
+}
 const lsKey = 'phrase.sourceLang';
 
 const safeLsGet = (key: string) => {
@@ -106,7 +112,7 @@ const LocaleConfigurationEditor: React.FC<Props> = props => {
   const store = useLocalStore(() => ({
     targetLangs: [] as string[],
     get availableLangs(): string[] {
-      const allowedLocales = getLocaleOptionsForRole().map((item: any) => item.value);
+      const allowedLocales = getLocaleOptionsForRole().map((item: any) => item.value).filter((locale: any) => !locale.startsWith('Default'));
       return (
         allowedLocales
         // appState.user.organization.value.customTargetingAttributes
@@ -160,20 +166,12 @@ const LocaleConfigurationEditor: React.FC<Props> = props => {
   ));
 };
 
-const ElementConfigurationEditor: React.FC<Props> = props => {
+const ElementConfigurationEditor: React.FC<ElementProps> = props => {
   const store = useLocalStore(() => ({
     all: false,
     targetLangs: [] as string[],
     get availableLangs(): string[] {
-      const allowedLocales = getLocaleOptionsForRole().map((item: any) => item.value);
-      return (
-        allowedLocales
-        // appState.user.organization.value.customTargetingAttributes
-        //   ?.get('locale')
-        //   ?.toJSON()
-        //   .enum?.filter((locale: string) => locale !== store.sourceLang)
-          .filter((item: string) => !props.deployedLocales.includes(item) && !props.currentLocaleTargets.includes(item)) || []
-      );
+      return props.deployedLocales.filter((locale: any) => !locale.startsWith('Default'));
     },
     sourceLang:
       safeLsGet(lsKey) ||
@@ -245,16 +243,15 @@ export async function getLangPicks(deployedLocales: string[], currentLocaleTarge
 }
 
 
-export async function getLangsPushElement(deployedLocales: string[], currentLocaleTargets: string[], elementsLength: number): Promise<{
+export async function getLangsPushElement(deployedLocales: string[], elementsLength: number): Promise<{
   sourceLang: string;
   targetLangs: string[];
 } | null> {
   return new Promise(async resolve => {
     const destroy = await appState.globalState.openDialog(
       React.createElement(ElementConfigurationEditor, {
-        elementsLength,
         deployedLocales: deployedLocales,
-        currentLocaleTargets: currentLocaleTargets,
+        elementsLength,
         onChoose: val => {
           resolve(val);
           destroy();

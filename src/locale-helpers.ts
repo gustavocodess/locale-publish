@@ -45,8 +45,13 @@ export async function updateSingleLocale(chidrenId: string, parentId: string, pr
   const masterContent = await (await fetch(`https://cdn.builder.io/api/v3/content/${modelName}/${parentId}?apiKey=${apiKey}&cachebust=true`)).json();
   const childrenContent = await (await fetch(`https://cdn.builder.io/api/v3/content/${modelName}/${chidrenId}?apiKey=${apiKey}&cachebust=true&includeUnpublished=true`)).json();
 
-  let childrenContentBlocks = (childrenContent?.data?.blocks?? []).filter((block: any) => !block?.id.includes('pixel'))
+  // let childrenContentBlocks = (fastClone(childrenContent?.data?.blocks) || []).filter((block: any) => !block?.id.includes('pixel'))
+  let childrenContentBlocks = childrenContent?.data?.blocks?.filter((block: any) => !block?.id.includes('pixel'))
   const masterBlocks = (masterContent?.data?.blocks?? []).filter((block: any) => !block?.id.includes('pixel'))
+
+  // console.log(' childrenContent blocks', )
+
+  console.log(' childrenContentBlocks ', childrenContentBlocks)
 
   const masterMap: any = {}
   masterBlocks?.forEach((block: any) => {
@@ -57,16 +62,20 @@ export async function updateSingleLocale(chidrenId: string, parentId: string, pr
 
   // verify blocks that should not erase translation
   childrenContentBlocks = childrenContentBlocks.map((block: any) => {
-    if (masterMap[block?.id]) {
-      return mergeLocalizedBlock(masterMap[block?.id], block, queryLocale?.value[0])
-    }
+    // TODO: revert to repush logic
+    // if (masterMap[block?.id]) {
+    //   return mergeLocalizedBlock(masterMap[block?.id], block, queryLocale?.value[0])
+    // }
     return block;
   })
+
+  console.log('childrenBlock aqui 1', childrenContentBlocks)
 
   // creating final blocks first based on master content only
   let finalBlocks = [...masterBlocks.map((block: any) => ({...block, meta: {...block.meta, masterId: block.id}}))]
 
   childrenContentBlocks?.forEach((childrenBlock: any, index: number) => {
+    console.log('childrenBlock aqui ', childrenBlock)
     if (masterMap[childrenBlock.id]) {
       //  significa que o bloco existe no master, entao ja foi atualizado
       // do nothing
@@ -77,11 +86,11 @@ export async function updateSingleLocale(chidrenId: string, parentId: string, pr
   })
 
   // console.log('new final blocks ', finalBlocks)
-  return
+  // return
 
   // call write API to update the children with new blocks
-  // const result = await updateChildren(chidrenId, privateKey, finalBlocks, modelName)
-  // return result;
+  const result = await updateChildren(chidrenId, privateKey, finalBlocks, modelName)
+  return result;
 }
 
 

@@ -12,9 +12,9 @@ import {
   Checkbox,
   Typography,
   Button,
-  Radio,
 } from '@material-ui/core';
 import { getLocaleOptionsForRole } from './locale-helpers';
+import MultiSelector from './MultiSelector';
 
 
 export function showPublishedNotification(locale: string, callback?: () => void) {
@@ -133,26 +133,12 @@ const LocaleConfigurationEditor: React.FC<Props> = props => {
         <Typography css={{fontWeight: 'bold', fontSize: 16 }}>Pick languages for push</Typography>
       </div>
       <div>
-        <Typography>Target Languages*</Typography>
-        <Select
-          multiple
-          fullWidth
-          value={store.targetLangs}
-          placeholder="+ Add a value"
-          renderValue={selected => (Array.isArray(selected) ? selected?.join(',') : selected)}
-          onChange={action(event => {
-            store.targetLangs = [...event.target.value];
-          })}
-        >
-          {
-            store.availableLangs.sort().map(locale => (
-              <MenuItem key={locale} value={locale}>
-                <Checkbox color="primary" checked={store.targetLangs.includes(locale)} />
-                <ListItemText primary={locale} />
-              </MenuItem>
-            ))
-          }
-        </Select>
+        <MultiSelector
+          options={store.availableLangs.sort()}
+          onChange={(values: string[]) => {
+            store.targetLangs = [...values]
+          }}
+        />
       </div>
       <DialogActions>
         <Button onClick={() => props.onChoose(null)} color="default">

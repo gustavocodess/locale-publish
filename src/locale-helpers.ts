@@ -51,8 +51,6 @@ export async function updateSingleLocale(chidrenId: string, parentId: string, pr
 
   // console.log(' childrenContent blocks', )
 
-  console.log(' childrenContentBlocks ', childrenContentBlocks)
-
   const masterMap: any = {}
   masterBlocks?.forEach((block: any) => {
     masterMap[block.id] = block
@@ -69,13 +67,10 @@ export async function updateSingleLocale(chidrenId: string, parentId: string, pr
     return block;
   })
 
-  console.log('childrenBlock aqui 1', childrenContentBlocks)
-
   // creating final blocks first based on master content only
   let finalBlocks = [...masterBlocks.map((block: any) => ({...block, meta: {...block.meta, masterId: block.id}}))]
 
   childrenContentBlocks?.forEach((childrenBlock: any, index: number) => {
-    console.log('childrenBlock aqui ', childrenBlock)
     if (masterMap[childrenBlock.id]) {
       //  significa que o bloco existe no master, entao ja foi atualizado
       // do nothing
@@ -210,6 +205,8 @@ export async function pushToLocales(localesToPublish: string[], cloneContent: an
 
 export async function updateParentWithReferences(parentContent: any, newLocaleReferences: any[], privateKey: string, modelName: string) {
   // UPDATE current content with children references
+  const liveParentDraft = fastClone(appState?.designerState?.editingContentModel)
+  const liveParentBlocks = JSON.parse(liveParentDraft?.data?.blocksString)
   return await fetch(
     `https://builder.io/api/v1/write/${modelName}/${parentContent.id}`,
     {
@@ -223,8 +220,12 @@ export async function updateParentWithReferences(parentContent: any, newLocaleRe
           localeChildren: [
             ...parentContent?.data?.localeChildren?? [],
             ...newLocaleReferences,
-          ]
-        }
+          ],
+          // had to add to draft because once use write API, the editor imediatlly refreshes to get
+          // latest content with the latest published, which is not what we want 
+          blocks: liveParentBlocks,
+        },
+        published: 'draft',
       }),
     }
   ).then(res => res);

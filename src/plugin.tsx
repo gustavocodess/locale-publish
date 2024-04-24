@@ -13,7 +13,7 @@ import {
   getQueryLocales,
 } from './plugin-helpers';
 import { getLangPicks, getLangsPushElement } from './snackbar-utils';
-import { getLocaleOptionsForRole, pushToLocales, updateSelectedElements } from './locale-helpers';
+import { pushToLocales, updateSelectedElements } from './locale-helpers';
 
 let registerTab = false
 
@@ -37,8 +37,18 @@ registerPlugin(
     registerEditorOnLoad(({ safeReaction }) => {
       safeReaction(
         () => {
-          const draftClone = fastClone(appState?.designerState?.editingContentModel);
+          // Hidding isGlobal manually
+          const { designerState } = appState;
+          const { editingContentModel } = designerState;
+          const isGlobalField = editingContentModel?.useFields?.filter((field: any) => field.name === 'isGlobal') || [];
+          if (isGlobalField && isGlobalField.length) {
+            isGlobalField[0].hidden = true;
+          }
+          const newFields = editingContentModel?.useFields?.filter((field: any) => field.name !== 'isGlobal');  
+          appState.designerState.editingContentModel.useFields = [...newFields, ...isGlobalField];
+          // end Hidding isGlobal manually
 
+          const draftClone = fastClone(appState?.designerState?.editingContentModel);
           const isGlobal = draftClone?.data?.isGlobal
           if (!isGlobal) {
             delete Builder.registry['editor.editTab']
@@ -87,7 +97,6 @@ registerPlugin(
           appState.snackBar.show(`No content to push, please have at least one element before pushing.`);
           return 
         }
-
         appState.globalState.showGlobalBlockingLoading(`Publishing for ${localesToPublish.join(' & ')} ....`);
         const success = await pushToLocales(localesToPublish, fastClone(content), privateKey, modelName);
 
@@ -119,7 +128,6 @@ registerPlugin(
 
         const deployedLocales = localeChildren.map((locale: any) => locale?.target?.value[0])
         const currentLocaleTargets = getQueryLocales(appState?.designerState?.editingContentModel)
-        console.log('currentLocaleTargets ', currentLocaleTargets)
 
         const picks = await getLangsPushElement(deployedLocales, elements.length);
 
@@ -136,11 +144,9 @@ registerPlugin(
           localeMap[children?.target?.value[0]] = children
         })
         const updates: any[]= []
-        console.log('localeMap ', localeMap)
         picks?.targetLangs?.map(async (pick: any) => {
           const childrenId = localeMap[pick]?.reference?.id
           const childrenModel = localeMap[pick]?.reference?.model
-          console.log('updatind... ', childrenId, masterClone?.id)
           updates.push(updateSelectedElements(childrenId, masterClone, privateKey, apiKey, childrenModel, elements[0]))
         })
 

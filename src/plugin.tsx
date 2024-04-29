@@ -37,17 +37,7 @@ registerPlugin(
     registerEditorOnLoad(({ safeReaction }) => {
       safeReaction(
         () => {
-          // Hidding isGlobal manually
-          const { designerState } = appState;
-          const { editingContentModel } = designerState;
-          const isGlobalField = editingContentModel?.useFields?.filter((field: any) => field.name === 'isGlobal') || [];
-          if (isGlobalField && isGlobalField.length) {
-            isGlobalField[0].hidden = true;
-          }
-          const newFields = editingContentModel?.useFields?.filter((field: any) => field.name !== 'isGlobal');  
-          appState.designerState.editingContentModel.useFields = [...newFields, ...isGlobalField];
-          // end Hidding isGlobal manually
-
+          // registering tab only once 
           const draftClone = fastClone(appState?.designerState?.editingContentModel);
           const isGlobal = draftClone?.data?.isGlobal
           if (!isGlobal) {
@@ -55,6 +45,18 @@ registerPlugin(
           } else if (isGlobal && !Builder.registry['editor.editTab']) {
             registerLocalesTab(privateKey);
           }
+
+          // Hidding isGlobal manually
+          const { designerState } = appState;
+          const { editingContentModel } = designerState;
+          const isGlobalField = editingContentModel?.useFields?.filter((field: any) => field.name === 'isGlobal') || [];
+          if (isGlobalField && isGlobalField.length) {
+            isGlobalField[0].hidden = true;
+          }
+          const newFields = editingContentModel?.useFields?.filter((field: any) => field.name !== 'isGlobal') || [];  
+          appState.designerState.editingContentModel.useFields = [...newFields, ...isGlobalField];
+          // end Hidding isGlobal manually
+
 
           return draftClone;
         },

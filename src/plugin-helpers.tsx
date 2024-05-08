@@ -59,6 +59,8 @@ export function getQueryLocales(content: any) {
   if (!content) return []
   const queries = fastClone(content ?? {})?.query?.filter((item: any) => item?.property === 'locale')
   const locales = queries.map((queryItem: any) => queryItem?.value.join())
+  if (!locales.length) return []
+
   return locales.join()?.split(",")
 }
 

@@ -15,8 +15,6 @@ import {
 import { getLangPicks, getLangsPushElement } from './snackbar-utils';
 import { pushToLocales, updateSelectedElements } from './locale-helpers';
 
-let registerTab = false
-
 registerPlugin(
   {
     name: 'Publish for Locale',
@@ -37,6 +35,11 @@ registerPlugin(
     registerEditorOnLoad(({ safeReaction }) => {
       safeReaction(
         () => {
+          // Set default locale to the one targeted
+          const currentLocaleTargets = getQueryLocales(appState?.designerState?.editingContentModel)
+          if (currentLocaleTargets?.length && currentLocaleTargets[0]) {
+            appState.designerState.activeLocale = currentLocaleTargets[0]
+          }
           // registering tab only once 
           const draftClone = fastClone(appState?.designerState?.editingContentModel);
           const isGlobal = draftClone?.data?.isGlobal
@@ -80,11 +83,17 @@ registerPlugin(
         const locale = appState.designerState?.activeLocale || 'Default';
         const modelName = content.modelName;
 
+        const currentLocaleTargets = getQueryLocales(appState?.designerState?.editingContentModel)
+        if (!currentLocaleTargets || !currentLocaleTargets.length) {
+          const newErrorObj = { id: `toggled-123`, level: "error", message: "Please have at least one locale targeted before pushing.", };
+          appState.designerState.errorWarnings = [...appState.designerState.errorWarnings, newErrorObj]
+          appState.snackBar.show(`Please have at least one locale targeted before pushing.`);
+          return;
+        }
+
         const localeChildren = fastClone(appState.designerState.editingContentModel?.data?.get("localeChildren")?? [])
 
         const deployedLocales = localeChildren.map((locale: any) => locale?.target?.value[0])
-        
-        const currentLocaleTargets = getQueryLocales(appState?.designerState?.editingContentModel)
 
         const picks = await getLangPicks(deployedLocales, currentLocaleTargets);
         const localesToPublish = picks?.targetLangs.map(e => e)

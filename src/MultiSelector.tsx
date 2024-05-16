@@ -41,7 +41,7 @@ export default function MultiSelector(props: Props) {
           <TextField
             {...params}
             variant="outlined"
-            label="Target Languages*"
+            label="Select countries*"
             placeholder="Select one or multiple languages"
             style={{ backgroundColor: 'white'}}
           />

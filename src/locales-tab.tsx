@@ -3,7 +3,7 @@ import {
   Button,
 } from '@material-ui/core';
 import appState from '@builder.io/app-context';
-import { updateSingleLocale } from './locale-helpers';
+import { updateSingleLocale, forcePushLocale } from './locale-helpers';
 import LocaleItem from './locale-item';
 import { fastClone } from './plugin-helpers';
 
@@ -38,11 +38,20 @@ const LocalesTab = (props: Props) => {
   //   console.log('master blocks ', masterBlocks);
   // }
 
+  const handleForcePush = async (childrenId: string) => {
+
+    await appState.globalState.showGlobalBlockingLoading(`Pushing changes...`);
+    const result = await forcePushLocale(childrenId, currentContent, privateKey, modelName)
+    if (result.status === 200) {
+      appState?.snackBar.show(`Suceessfully updated ${childrenId} with global master blocks.`);
+    }
+    await appState.globalState.hideGlobalBlockingLoading();
+  };
 
   const handlePushChanges = async (childrenId: string) => {
     const result = await updateSingleLocale(childrenId, parentId, privateKey, apiKey, modelName)
     if (result.status === 200) {
-      appState?.snackBar.show(`Suceessfully updated ${childrenId} with new blocks`);
+      appState?.snackBar.show(`Suceessfully updated ${childrenId} with new blocks.`);
     }
   };
 
@@ -70,9 +79,14 @@ const LocalesTab = (props: Props) => {
         </>
       }
       {
-        localeChildren?.map((locale: any, index: number) => {
+        localeChildren?.map((locale: any) => {
           return (
-            <LocaleItem item={locale} onPush={() => handlePushChanges(locale?.reference?.id)} />
+            <LocaleItem
+              key={`locale-item-${locale?.reference?.id}`}
+              item={locale}
+              onPush={() => handlePushChanges(locale?.reference?.id)}
+              onForcePush={() => handleForcePush(locale?.reference?.id)}
+            />
           )
         })
       }

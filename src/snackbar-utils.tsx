@@ -130,7 +130,7 @@ const LocaleConfigurationEditor: React.FC<Props> = props => {
   return useObserver(() => (
     <div css={{ margin: 20 }}>
       <div css={{ marginTop: 8, marginBottom: 20 }}>
-        <Typography css={{fontWeight: 'bold', fontSize: 16 }}>Pick languages for push</Typography>
+        <Typography css={{fontWeight: 'bold', fontSize: 16 }}>Push to countries</Typography>
       </div>
       <div>
         <MultiSelector
@@ -145,7 +145,7 @@ const LocaleConfigurationEditor: React.FC<Props> = props => {
           Cancel
         </Button>
         <Button variant="contained" onClick={() => props.onChoose(store)} color="primary">
-          Create Locales
+          Push
         </Button>
       </DialogActions>
     </div>
@@ -170,7 +170,7 @@ const ElementConfigurationEditor: React.FC<ElementProps> = props => {
         <Typography css={{fontWeight: 'bold', fontSize: 16 }}>Push {props.elementsLength} component for</Typography>
       </div>
       <div>
-        <Typography>Target Languages*</Typography>
+        <Typography>Select countries*</Typography>
         <Select
           multiple
           fullWidth
@@ -222,7 +222,10 @@ export async function getLangPicks(deployedLocales: string[], currentLocaleTarge
         },
       }),
       true,
-      {},
+      {
+        // dialogProps
+        disableBackdropClick: true,
+      },
       () => resolve(null)
     );
   });

@@ -38,7 +38,11 @@ registerPlugin(
           // Set default locale to the one targeted
           const currentLocaleTargets = getQueryLocales(appState?.designerState?.editingContentModel)
           if (currentLocaleTargets?.length && currentLocaleTargets[0]) {
-            appState.designerState.activeLocale = currentLocaleTargets[0]
+            if (currentLocaleTargets[0] === 'en-AA') {
+              appState.designerState.activeLocale = 'Default'
+            } else {
+              appState.designerState.activeLocale = currentLocaleTargets[0]
+            }
           }
           // registering tab only once 
           const draftClone = fastClone(appState?.designerState?.editingContentModel);
@@ -108,14 +112,14 @@ registerPlugin(
           appState.snackBar.show(`No content to push, please have at least one element before pushing.`);
           return 
         }
-        appState.globalState.showGlobalBlockingLoading(`Publishing for ${localesToPublish.join(' & ')} ....`);
+        appState.globalState.showGlobalBlockingLoading(`Pushing for ${localesToPublish.join(' & ')} ....`);
         const success = await pushToLocales(localesToPublish, fastClone(content), privateKey, modelName);
 
         if (success) {
-          appState.snackBar.show(`Published content for ${localesToPublish.join(' & ')}.`);
+          appState.snackBar.show(`Pushed content to ${localesToPublish.join(' & ')}.`);
           // update parent with children references created
         } else {
-          appState.snackBar.show(`Error publishing for ${locale}. Contact Admin.`);
+          appState.snackBar.show(`Error pushing for ${locale}. Contact Admin.`);
         }
         appState.globalState.hideGlobalBlockingLoading();
         }
@@ -148,7 +152,7 @@ registerPlugin(
 
         const masterClone = fastClone(appState.designerState.editingContentModel)
         const apiKey = fastClone(appState?.user?.apiKey)
-        appState.globalState.showGlobalBlockingLoading(`Publishing for ${picks?.targetLangs.join(' & ')} ....`);
+        appState.globalState.showGlobalBlockingLoading(`Pushing for ${picks?.targetLangs.join(' & ')} ....`);
 
         const localeMap = {} as any
         localeChildren?.map((children: any) => {
@@ -166,7 +170,7 @@ registerPlugin(
 
         // check if all results return oks from Write API
         if (allUpdated.filter((ok: boolean) => !ok)?.length) {
-          appState.snackBar.show(`Error publishing component. Contact Admin.`);
+          appState.snackBar.show(`Error pushing component. Contact Admin.`);
         } else {
           appState.snackBar.show(`Succesfully pushed component for ${picks?.targetLangs?.length} locales.`);
         }

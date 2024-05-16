@@ -1,5 +1,5 @@
 import { IconButton, Tooltip, Typography, Divider } from '@material-ui/core';
-import { RemoveRedEye, Publish, Language, Code } from '@material-ui/icons';
+import { RemoveRedEye, Publish, Language, Code, SettingsRemote } from '@material-ui/icons';
 import React from 'react';
 interface Props {
   item: {
@@ -16,10 +16,11 @@ interface Props {
     }
   }
   onPush: (childrenId: string) => void;
+  onForcePush: (childrenId: string) => void;
 }
 
 const LocaleItem = (props: Props) => {
-  const { item, onPush } = props
+  const { item, onPush, onForcePush } = props
   if (!item || !item?.reference) return null
 
   return (
@@ -46,7 +47,7 @@ const LocaleItem = (props: Props) => {
             <RemoveRedEye css={{ opacity: 0.7, fontSize: 20 }} />
           </IconButton>
           </Tooltip>
-          <Tooltip enterDelay={100} title="Push to this local" placement="left">
+          <Tooltip enterDelay={100} title="Push for locale" placement="left">
             <IconButton
               css={{ position: 'absolute', top: 0, right: 0 }}
               onClick={() =>  onPush(item?.reference?.id)}
@@ -55,6 +56,15 @@ const LocaleItem = (props: Props) => {
             </IconButton>
           </Tooltip>
         </div>
+
+        <Tooltip enterDelay={100} title="Force Re-Push" placement="left">
+          <IconButton
+            css={{ position: 'absolute', top: 0, right: 0 }}
+            onClick={() =>  onForcePush(item?.reference?.id)}
+          >
+            <SettingsRemote css={{ opacity: 0.7, fontSize: 20 }} />
+          </IconButton>
+        </Tooltip>
 
         {/* <Tooltip enterDelay={100} title="Compare content" placement="left">
           <IconButton

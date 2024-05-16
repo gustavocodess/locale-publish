@@ -1,7 +1,9 @@
 import traverse from "traverse";
 import appState from '@builder.io/app-context';
 import { pushLocale, updateChildren } from "./locale-service";
-import { fastClone } from "./plugin-helpers";
+import { fastClone, getQueryLocales } from "./plugin-helpers";
+import { Builder, BuilderComponent } from "@builder.io/react";
+import { BuilderContent } from "@builder.io/sdk";
 
 export function mergeLocalizedBlock(masterBlock: any, childrenBlock: any, locale: any) {
   // IDEA:
@@ -39,6 +41,20 @@ export function mergeLocalizedBlock(masterBlock: any, childrenBlock: any, locale
     return childrenBlock
   })
 
+}
+
+export async function forcePushLocale(chidrenId: string, masterContent: BuilderContent, privateKey: string, modelName: string) {
+  const masterBlocks = (JSON.parse(masterContent?.data?.blocksString)).filter((block: any) => !block?.id.includes('pixel'))
+  // creating final blocks based on master content only
+  let finalBlocks = [...masterBlocks.map((block: any) => ({...block, meta: {...block.meta, masterId: block.id}}))]
+
+  console.log('new final blocks ', finalBlocks)
+  console.log('master content ', masterContent)
+  // return
+
+  // call write API to update the children with new blocks
+  const result = await updateChildren(chidrenId, privateKey, finalBlocks, modelName, masterContent?.data)
+  return result;
 }
 
 export async function updateSingleLocale(chidrenId: string, parentId: string, privateKey: string, apiKey: string, modelName: string) {
@@ -84,7 +100,7 @@ export async function updateSingleLocale(chidrenId: string, parentId: string, pr
   // return
 
   // call write API to update the children with new blocks
-  const result = await updateChildren(chidrenId, privateKey, finalBlocks, modelName)
+  const result = await updateChildren(chidrenId, privateKey, finalBlocks, modelName, masterContent?.data)
   return result;
 }
 
@@ -113,7 +129,7 @@ export async function updateSelectedElements(chidrenId: string, masterClone: any
     // TODO: instead of updating whole element, preserve existing translations on existing children (if exist)
     finalBlocks[elementIndex] = elementToAdd
     // console.log('already existss ...', finalBlocks)
-    return (await updateChildren(chidrenId, privateKey, finalBlocks, modelName))?.ok
+    return (await updateChildren(chidrenId, privateKey, finalBlocks, modelName, masterClone?.data))?.ok
   }
 
   // ELSE: IN CASE NEW ELEMENT DOESNT EXIST ON CHILDREN CONTENT
@@ -131,13 +147,14 @@ export async function updateSelectedElements(chidrenId: string, masterClone: any
   ]
   // console.log('final blocks aqui ', finalBlocks)
 
-  return (await updateChildren(chidrenId, privateKey, finalBlocks, modelName))?.ok
+  return (await updateChildren(chidrenId, privateKey, finalBlocks, modelName, masterClone?.data))?.ok
 }
 
 export async function pushToLocales(localesToPublish: string[], cloneContent: any, privateKey: string, modelName: string) {
 
   const newBlocks = (JSON.parse(cloneContent?.data?.blocksString)?? []).map((block: any) => ({...block, meta: {...block.meta, masterId: block.id}}));
   const createdEntries: any[] = []
+  const currentLocaleTargets = getQueryLocales(appState?.designerState?.editingContentModel)
 
   const results = localesToPublish.map(async (locale: string) => {
     const localeTarget = {
@@ -160,7 +177,7 @@ export async function pushToLocales(localesToPublish: string[], cloneContent: an
         },
         isGlobal: false,
       },
-      name: `local for ${cloneContent.name} - ${locale}`,
+      name: `local from ${currentLocaleTargets.join('-')} | ${cloneContent.name} - ${locale}`,
       published: 'draft',
       query: [
         //remove locales from global in case there is any: should not go to local page

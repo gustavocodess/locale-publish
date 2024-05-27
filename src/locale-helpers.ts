@@ -2,7 +2,6 @@ import traverse from "traverse";
 import appState from '@builder.io/app-context';
 import { pushLocale, updateChildren } from "./locale-service";
 import { fastClone, getQueryLocales } from "./plugin-helpers";
-import { Builder, BuilderComponent } from "@builder.io/react";
 import { BuilderContent } from "@builder.io/sdk";
 
 export function mergeLocalizedBlock(masterBlock: any, childrenBlock: any, locale: any) {
@@ -43,29 +42,32 @@ export function mergeLocalizedBlock(masterBlock: any, childrenBlock: any, locale
 
 }
 
-export async function forcePushLocale(chidrenId: string, masterContent: BuilderContent, privateKey: string, modelName: string) {
+export async function forcePushLocale(chidrenId: string, masterContent: BuilderContent, privateKey: string, apiKey: string, modelName: string) {
   const masterBlocks = (JSON.parse(masterContent?.data?.blocksString)).filter((block: any) => !block?.id.includes('pixel'))
+  const childrenContent = await (await fetch(`https://cdn.builder.io/api/v3/content/${modelName}/${chidrenId}?apiKey=${apiKey}&cachebust=true&includeUnpublished=true`)).json();
   // creating final blocks based on master content only
   let finalBlocks = [...masterBlocks.map((block: any) => ({...block, meta: {...block.meta, masterId: block.id}}))]
-
-  console.log('new final blocks ', finalBlocks)
-  console.log('master content ', masterContent)
   // return
 
+  const queryLocale = childrenContent?.query?.find((query: any) => query?.property === 'locale')
+  const newQuery = [
+    // @ts-ignore next-line
+    ...masterContent?.query.filter((query: any) => query?.property !== 'locale'),
+    {
+      ...queryLocale,
+    }
+  ]
   // call write API to update the children with new blocks
-  const result = await updateChildren(chidrenId, privateKey, finalBlocks, modelName, masterContent?.data)
+  const result = await updateChildren(chidrenId, privateKey, finalBlocks, modelName, masterContent?.data, newQuery)
   return result;
 }
 
 export async function updateSingleLocale(chidrenId: string, parentId: string, privateKey: string, apiKey: string, modelName: string) {
-  const masterContent = await (await fetch(`https://cdn.builder.io/api/v3/content/${modelName}/${parentId}?apiKey=${apiKey}&cachebust=true`)).json();
+  const masterContent = fastClone(appState?.designerState?.editingContentModel)
   const childrenContent = await (await fetch(`https://cdn.builder.io/api/v3/content/${modelName}/${chidrenId}?apiKey=${apiKey}&cachebust=true&includeUnpublished=true`)).json();
-
-  // let childrenContentBlocks = (fastClone(childrenContent?.data?.blocks) || []).filter((block: any) => !block?.id.includes('pixel'))
+  
+  const masterBlocks = (JSON.parse(masterContent?.data?.blocksString)).filter((block: any) => !block?.id.includes('pixel'))
   let childrenContentBlocks = childrenContent?.data?.blocks?.filter((block: any) => !block?.id.includes('pixel'))
-  const masterBlocks = (masterContent?.data?.blocks?? []).filter((block: any) => !block?.id.includes('pixel'))
-
-  // console.log(' childrenContent blocks', )
 
   const masterMap: any = {}
   masterBlocks?.forEach((block: any) => {
@@ -99,8 +101,24 @@ export async function updateSingleLocale(chidrenId: string, parentId: string, pr
   // console.log('new final blocks ', finalBlocks)
   // return
 
+  // merge data fields (keep translation)
+  const finalDataFields: any = {...masterContent?.data}
+  Object.keys(masterContent?.data).map((key: string) => {
+    if (
+      masterContent?.data[key]?.['@type'] === '@builder.io/core:LocalizedValue' &&
+      childrenContent?.data[key]
+    ) {
+      if (masterContent?.data[key]?.Default === childrenContent?.data[key]?.Default) {
+        finalDataFields[key] = childrenContent?.data[key]
+      }
+      // else {
+        // DO NOTHING, DATA FIELD WILL RECEIVE MASTER CONTENT AND REQUIRES NEW TRANSLATION
+      // }
+    }
+  })
+
   // call write API to update the children with new blocks
-  const result = await updateChildren(chidrenId, privateKey, finalBlocks, modelName, masterContent?.data)
+  const result = await updateChildren(chidrenId, privateKey, finalBlocks, modelName, finalDataFields)
   return result;
 }
 
@@ -120,6 +138,7 @@ export async function updateSelectedElements(chidrenId: string, masterClone: any
   elementToAdd = {...elementToAdd, meta: { ...elementToAdd.meta, masterId: masterClone?.id}}
 
   // console.log('meta meta elementToAdd', elementToAdd)
+
 
   if (childrenMap[elementToUpdate?.id] || childrenMap[elementToUpdate?.meta?.previousId]) {
     // console.log('already existss ...')

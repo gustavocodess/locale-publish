@@ -41,7 +41,7 @@ const LocalesTab = (props: Props) => {
   const handleForcePush = async (childrenId: string) => {
 
     await appState.globalState.showGlobalBlockingLoading(`Pushing changes...`);
-    const result = await forcePushLocale(childrenId, currentContent, privateKey, modelName)
+    const result = await forcePushLocale(childrenId, currentContent, privateKey, apiKey ,modelName)
     if (result.status === 200) {
       appState?.snackBar.show(`Suceessfully updated ${childrenId} with global master blocks.`);
     }

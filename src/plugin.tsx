@@ -135,7 +135,6 @@ registerPlugin(
           // todo: maybe apply for multiple??
           return isGlobal;
         }
-        return false;
       },
       async onClick(elements) {
 

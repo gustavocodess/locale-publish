@@ -89,3 +89,16 @@ export interface CustomReactEditorProps<T = any> {
 
 export const fastClone = (obj: any) =>
   obj === undefined ? undefined : JSON.parse(JSON.stringify(obj));
+
+
+export const deepGet = (obj: any, newPath: string) => {
+  for (let i = 0, path = newPath.split('.'), len=path.length; i<len; i++){
+    if (path[i] && obj[path[i]]) {
+      obj = obj[path[i]];
+    } else {
+      // console.log('deepGet error: ', obj, newPath);
+      return undefined;
+    }
+  };
+  return obj;
+};

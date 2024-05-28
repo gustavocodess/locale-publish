@@ -26,22 +26,9 @@ const LocalesTab = (props: Props) => {
     return null
   }
 
-  // const handleRefresh = async () => {
-  //   const chidrenId = '4cc33b2a723f46ed964092d9a5f840ce'
-  //   const masterContent = await (await fetch(`https://cdn.builder.io/api/v3/content/page/${parentId}?apiKey=9f9421c6a1ba44f6a3e0e4d7e47f4e5a&cachebust=true`)).json();
-  //   const childrenContent = await (await fetch(`https://cdn.builder.io/api/v3/content/page/${chidrenId}?apiKey=9f9421c6a1ba44f6a3e0e4d7e47f4e5a&cachebust=true&includeUnpublished=true`)).json();
-  //   console.log('children content ',  childrenContent?.data)
-
-  //   const childrenContentBlocks = (childrenContent?.data?.blocks?? []).filter((block: any) => !block?.id.includes('pixel'))
-  //   console.log('children content blocks ',  childrenContentBlocks);
-  //   const masterBlocks = (masterContent?.data?.blocks?? []).filter((block: any) => !block?.id.includes('pixel'))
-  //   console.log('master blocks ', masterBlocks);
-  // }
-
   const handleForcePush = async (childrenId: string) => {
-
     await appState.globalState.showGlobalBlockingLoading(`Pushing changes...`);
-    const result = await forcePushLocale(childrenId, currentContent, privateKey, apiKey ,modelName)
+    const result = await forcePushLocale(childrenId, privateKey, apiKey ,modelName)
     if (result.status === 200) {
       appState?.snackBar.show(`Suceessfully updated ${childrenId} with global master blocks.`);
     }
@@ -70,7 +57,6 @@ const LocalesTab = (props: Props) => {
     <div style={{ padding: 8, paddingBottom: 64 }}>
       <div style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <h3 style={{ marginLeft: 8 }}>Deployed Locales ({localeChildren?.length})</h3>
-        {/* <Button onClick={handleRefresh}>refresh</Button> */}
       </div>
       {
         localeChildren?.length === 0 && <>

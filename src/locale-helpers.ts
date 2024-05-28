@@ -1,8 +1,10 @@
 import traverse from "traverse";
 import appState from '@builder.io/app-context';
 import { pushLocale, updateChildren } from "./locale-service";
-import { fastClone, getQueryLocales } from "./plugin-helpers";
-import { BuilderContent } from "@builder.io/sdk";
+import { deepGet, fastClone, getQueryLocales } from "./plugin-helpers";
+import { findIndex } from "lodash";
+import { deepSet } from './deep-set';
+
 
 export function mergeLocalizedBlock(masterBlock: any, childrenBlock: any, locale: any) {
   // IDEA:
@@ -14,35 +16,43 @@ export function mergeLocalizedBlock(masterBlock: any, childrenBlock: any, locale
 
   // Optimizing traverse
   delete childrenToTraverse.responsiveStyles
-  traverse(childrenToTraverse).map(function (value: any) {
-    const path = this.path.join('.')
+  // console.log('childrenToTraverse ', childrenToTraverse)
+  traverse(childrenToTraverse).map(function () {
+    const path = this.path.join('.') 
     if (path.endsWith('Default')) {
-      if (masterBlock[`${path}`] === childrenBlock[`${path}`] && locale) {
-        // TODO: IMPORTANT: THIS SHOULD ONLY UPDATE TEXTS THAT EXISTS BOTH ON GLOBAL AND LOCAL,
-        // TODO: IF VALUE IS DIFFERENT ON GLOBAL VS LOCAL THEN SHOULD REQUIRE A NEW TRANSLATION
+      console.log('master default ', deepGet(masterBlock, path))
+      console.log('chhildren default ', deepGet(childrenBlock, path))
+      console.log('path path ', path)
+      if (deepGet(masterBlock, path) === deepGet(childrenBlock, path) && locale) {
+        // ! THIS SHOULD ONLY UPDATE TEXTS THAT EXISTS BOTH ON GLOBAL AND LOCAL,
+        // ! IF VALUE IS DIFFERENT ON GLOBAL VS LOCAL THEN SHOULD REQUIRE A NEW TRANSLATION
         translationsMap[path] = {
-          [locale]: childrenBlock[`${path}`]
+          [locale]: deepGet(childrenBlock, path.replace('.Default', `.${locale}`)),
+        }
+      } else if (deepGet(masterBlock, path) && deepGet(childrenBlock, path)) {
+        // !IMPORTANT: it means the value exists but its different from the global, so it should require a new translation
+        // console.log('SETANDO NULO ', path)
+        translationsMap[path] = {
+          [locale]: deepGet(masterBlock, path),
+          Default: deepGet(masterBlock, path),
         }
       }
     }
 
-    // now we have translations on translationMap
-    // console.log('path content value ', value)
-    // console.log('context.path ', this.path)
-
     Object.keys(translationsMap).map((keyPath: string) => {
-      childrenBlock[keyPath] = {
-        ...childrenBlock[keyPath],
-        [locale]: translationsMap[keyPath]
+      const newValue = {
+        ...deepGet(childrenBlock, keyPath.replace('.Default', '')),
+        ...translationsMap[keyPath],
       }
+      deepSet(childrenBlock, keyPath.replace('.Default', ''), newValue, false)
     })
-    // console.log('new children block ', childrenBlock)
-    return childrenBlock
   })
+  return childrenBlock
 
 }
 
-export async function forcePushLocale(chidrenId: string, masterContent: BuilderContent, privateKey: string, apiKey: string, modelName: string) {
+export async function forcePushLocale(chidrenId: string, privateKey: string, apiKey: string, modelName: string) {
+  const masterContent = fastClone(appState?.designerState?.editingContentModel)
   const masterBlocks = (JSON.parse(masterContent?.data?.blocksString)).filter((block: any) => !block?.id.includes('pixel'))
   const childrenContent = await (await fetch(`https://cdn.builder.io/api/v3/content/${modelName}/${chidrenId}?apiKey=${apiKey}&cachebust=true&includeUnpublished=true`)).json();
   // creating final blocks based on master content only
@@ -79,28 +89,27 @@ export async function updateSingleLocale(chidrenId: string, parentId: string, pr
   // verify blocks that should not erase translation
   childrenContentBlocks = childrenContentBlocks.map((block: any) => {
     // TODO: revert to repush logic
-    // if (masterMap[block?.id]) {
-    //   return mergeLocalizedBlock(masterMap[block?.id], block, queryLocale?.value[0])
-    // }
+  
+    if (masterMap[block?.id]) {
+      const newBlock = mergeLocalizedBlock(masterMap[block?.id], block, queryLocale?.value[0])
+      return newBlock
+    }
     return block;
   })
-
   // creating final blocks first based on master content only
   let finalBlocks = [...masterBlocks.map((block: any) => ({...block, meta: {...block.meta, masterId: block.id}}))]
 
   childrenContentBlocks?.forEach((childrenBlock: any, index: number) => {
     if (masterMap[childrenBlock.id]) {
       //  significa que o bloco existe no master, entao ja foi atualizado
-      // do nothing
+      // !IMPORTANT: switch to new block with translations
+      const indexToReplace = findIndex(finalBlocks, (block: any) => block.id === childrenBlock.id)
+      finalBlocks[indexToReplace] = childrenBlock
     } else if (!masterMap[childrenBlock.id] && !childrenBlock?.meta?.masterId) {
     // significa que o bloco nao existe na master e nao veio da master antiga
     finalBlocks = [...finalBlocks.slice(0, index), childrenBlock, ...finalBlocks.slice(index)]
     }
   })
-
-  // console.log('new final blocks ', finalBlocks)
-  // return
-
   // merge data fields (keep translation)
   const finalDataFields: any = {...masterContent?.data}
   Object.keys(masterContent?.data).map((key: string) => {
@@ -137,11 +146,7 @@ export async function updateSelectedElements(chidrenId: string, masterClone: any
   let elementToAdd = fastClone(elementToUpdate)
   elementToAdd = {...elementToAdd, meta: { ...elementToAdd.meta, masterId: masterClone?.id}}
 
-  // console.log('meta meta elementToAdd', elementToAdd)
-
-
   if (childrenMap[elementToUpdate?.id] || childrenMap[elementToUpdate?.meta?.previousId]) {
-    // console.log('already existss ...')
     // it means the element already exists on children, so update content
     let finalBlocks = [...childrenContentBlocks.map((block: any) => (block))]
     const elementIndex = childrenContentBlocks.findIndex((block: any) => block?.meta?.previousId === elementToUpdate?.id || block.id === elementToUpdate?.id)
@@ -261,7 +266,7 @@ export async function updateParentWithReferences(parentContent: any, newLocaleRe
           // latest content with the latest published, which is not what we want 
           blocks: liveParentBlocks,
         },
-        published: 'draft',
+        // published: 'draft',
       }),
     }
   ).then(res => res);

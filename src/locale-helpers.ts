@@ -4,6 +4,12 @@ import { pushLocale, updateChildren } from "./locale-service";
 import { deepGet, fastClone, getQueryLocales } from "./plugin-helpers";
 import { findIndex } from "lodash";
 import { deepSet } from './deep-set';
+import { BuilderContent } from "@builder.io/react";
+
+interface BuilderBlock {
+  responsiveStyles: any;
+  meta: any;
+}
 
 
 export function mergeLocalizedBlock(masterBlock: any, childrenBlock: any, locale: any) {
@@ -20,9 +26,6 @@ export function mergeLocalizedBlock(masterBlock: any, childrenBlock: any, locale
   traverse(childrenToTraverse).map(function () {
     const path = this.path.join('.') 
     if (path.endsWith('Default')) {
-      console.log('master default ', deepGet(masterBlock, path))
-      console.log('chhildren default ', deepGet(childrenBlock, path))
-      console.log('path path ', path)
       if (deepGet(masterBlock, path) === deepGet(childrenBlock, path) && locale) {
         // ! THIS SHOULD ONLY UPDATE TEXTS THAT EXISTS BOTH ON GLOBAL AND LOCAL,
         // ! IF VALUE IS DIFFERENT ON GLOBAL VS LOCAL THEN SHOULD REQUIRE A NEW TRANSLATION
@@ -31,7 +34,6 @@ export function mergeLocalizedBlock(masterBlock: any, childrenBlock: any, locale
         }
       } else if (deepGet(masterBlock, path) && deepGet(childrenBlock, path)) {
         // !IMPORTANT: it means the value exists but its different from the global, so it should require a new translation
-        // console.log('SETANDO NULO ', path)
         translationsMap[path] = {
           [locale]: deepGet(masterBlock, path),
           Default: deepGet(masterBlock, path),
@@ -51,24 +53,67 @@ export function mergeLocalizedBlock(masterBlock: any, childrenBlock: any, locale
 
 }
 
+function localizeBlocksFromMaster(masterBlocks: BuilderBlock[], locale: string) {
+  const newBlocks:BuilderBlock[] =  []
+  masterBlocks.forEach((block: BuilderBlock) => {
+    const blockToTraverse = {...masterBlocks}
+    // @ts-ignore next-line
+    delete blockToTraverse.responsiveStyles
+    // @ts-ignore next-line
+    delete blockToTraverse.meta
+
+  traverse(block).map(function () {
+    const path = this.path.join('.') 
+    if (path.endsWith('Default')) {
+      const valueToTranslate = deepGet(block, path)
+      deepSet(block, path.replace('Default', locale), valueToTranslate, true)
+    }
+  })
+    newBlocks.push(block)
+  })
+
+  return newBlocks;
+
+
+}
+
+function localizeDataFromMaster(masterData: BuilderContent, locale: string) {
+  const newData = {...masterData}
+  // @ts-ignore next-line
+  delete newData.blocksString
+  // @ts-ignore next-line
+  delete newData.blocks
+
+  traverse(newData).map(function () {
+    const path = this.path.join('.') 
+    if (path.endsWith('Default')) {
+      const valueToTranslate = deepGet(newData, path)
+      deepSet(newData, path.replace('Default', locale), valueToTranslate, true)
+    }
+  })
+  return newData;
+}
+
 export async function forcePushLocale(chidrenId: string, privateKey: string, apiKey: string, modelName: string) {
   const masterContent = fastClone(appState?.designerState?.editingContentModel)
   const masterBlocks = (JSON.parse(masterContent?.data?.blocksString)).filter((block: any) => !block?.id.includes('pixel'))
   const childrenContent = await (await fetch(`https://cdn.builder.io/api/v3/content/${modelName}/${chidrenId}?apiKey=${apiKey}&cachebust=true&includeUnpublished=true`)).json();
+
+  const childrenLocale = childrenContent?.query.filter((query: any) => query?.property === 'locale')[0]?.value[0]
+  const newBlocks = localizeBlocksFromMaster(masterBlocks, childrenLocale) 
   // creating final blocks based on master content only
-  let finalBlocks = [...masterBlocks.map((block: any) => ({...block, meta: {...block.meta, masterId: block.id}}))]
-  // return
+  const finalBlocks = [...newBlocks.map((block: any) => ({...block, meta: {...block.meta, masterId: block.id}}))]
+  const finalDataFields: any = localizeDataFromMaster(masterContent.data, childrenLocale)
 
   const queryLocale = childrenContent?.query?.find((query: any) => query?.property === 'locale')
   const newQuery = [
-    // @ts-ignore next-line
     ...masterContent?.query.filter((query: any) => query?.property !== 'locale'),
     {
       ...queryLocale,
     }
   ]
   // call write API to update the children with new blocks
-  const result = await updateChildren(chidrenId, privateKey, finalBlocks, modelName, masterContent?.data, newQuery)
+  const result = await updateChildren(chidrenId, privateKey, finalBlocks, modelName, finalDataFields, newQuery)
   return result;
 }
 
@@ -176,11 +221,15 @@ export async function updateSelectedElements(chidrenId: string, masterClone: any
 
 export async function pushToLocales(localesToPublish: string[], cloneContent: any, privateKey: string, modelName: string) {
 
-  const newBlocks = (JSON.parse(cloneContent?.data?.blocksString)?? []).map((block: any) => ({...block, meta: {...block.meta, masterId: block.id}}));
+
   const createdEntries: any[] = []
   const currentLocaleTargets = getQueryLocales(appState?.designerState?.editingContentModel)
 
   const results = localesToPublish.map(async (locale: string) => {
+    const masterBlocks = (JSON.parse(cloneContent?.data?.blocksString)?? []).map((block: any) => ({...block, meta: {...block.meta, masterId: block.id}}));
+    const newBlocks = localizeBlocksFromMaster(masterBlocks, locale)
+    const masterData = cloneContent?.data
+    const newData = localizeDataFromMaster(masterData, locale)
     const localeTarget = {
       "@type": "@builder.io/core:Query",
       "property": "locale",
@@ -191,7 +240,8 @@ export async function pushToLocales(localesToPublish: string[], cloneContent: an
     const newContent = {
       ...cloneContent,
       data: {
-        ...cloneContent.data,
+        // ...cloneContent.data,
+        ...newData,
         blocks: newBlocks,
         // adding parent for reference from Global Master
         parent: {

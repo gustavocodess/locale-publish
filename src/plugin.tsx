@@ -141,8 +141,6 @@ registerPlugin(
         const localeChildren = fastClone(appState.designerState.editingContentModel?.data?.get("localeChildren")?? [])
 
         const deployedLocales = localeChildren.map((locale: any) => locale?.target?.value[0])
-        const currentLocaleTargets = getQueryLocales(appState?.designerState?.editingContentModel)
-
         const picks = await getLangsPushElement(deployedLocales, elements.length);
 
         if (!picks?.targetLangs?.length) {

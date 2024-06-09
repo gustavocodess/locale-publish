@@ -88,13 +88,10 @@ registerPlugin(
       },
       async onClick() {
         const clone = fastClone(appState.designerState.editingContentModel)
-        console.log('currentContent ', clone)
         const modelName = appState.designerState.editingContentModel.modelName;
 
         const cloneBlocks = clone?.data?.blocksString || null
         appState.globalState.showGlobalBlockingLoading(`Duplicating entry...`);
-
-        console.log('caralho chegeui aqui ', clone?.data?.isGlobal)
         const newData = {
           ...clone?.data,
           localeChildren: [],

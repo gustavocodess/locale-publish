@@ -165,9 +165,10 @@ export async function updateSingleLocale(chidrenId: string, parentId: string, pr
       if (masterContent?.data[key]?.Default === childrenContent?.data[key]?.Default) {
         finalDataFields[key] = childrenContent?.data[key]
       }
-      // else {
-        // DO NOTHING, DATA FIELD WILL RECEIVE MASTER CONTENT AND REQUIRES NEW TRANSLATION
-      // }
+      else {
+        deepSet(finalDataFields, key.concat(`.${queryLocale?.value[0]}`), masterContent?.data[key]?.Default, true)
+        deepSet(finalDataFields, key.concat('.Default'), masterContent?.data[key]?.Default, true)
+      }
     }
   })
 

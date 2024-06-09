@@ -56,3 +56,18 @@ export async function pushLocale(newContent: any, privateKey: string, modelName:
   ).then(res => res);
   return result;
 }
+
+export async function createDuplicate(newContent: any, privateKey: string, modelName: string) {
+  const result = await fetch(
+    `https://builder.io/api/v1/write/${modelName}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${privateKey}`
+      },
+      body: JSON.stringify(newContent),
+    }
+  ).then(res => res);
+  return result;
+}

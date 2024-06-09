@@ -14,6 +14,7 @@ import {
 } from './plugin-helpers';
 import { getLangPicks, getLangsPushElement } from './snackbar-utils';
 import { pushToLocales, updateSelectedElements } from './locale-helpers';
+import { createDuplicate } from './locale-service';
 
 registerPlugin(
   {
@@ -35,6 +36,7 @@ registerPlugin(
     registerEditorOnLoad(({ safeReaction }) => {
       safeReaction(
         () => {
+          appState.designerState.editorOptions.disableOverflowButtons = ['duplicate', 'delete']
           // Set default locale to the one targeted
           const currentLocaleTargets = getQueryLocales(appState?.designerState?.editingContentModel)
           if (currentLocaleTargets?.length && currentLocaleTargets[0]) {
@@ -49,8 +51,10 @@ registerPlugin(
           const isGlobal = draftClone?.data?.isGlobal
           if (!isGlobal) {
             delete Builder.registry['editor.editTab']
+            appState.designerState.editorOptions.disableTargetingFields = ['urlPath', 'url', 'locale']
           } else if (isGlobal && !Builder.registry['editor.editTab']) {
             registerLocalesTab(privateKey);
+            appState.designerState.editorOptions.disableTargetingFields = []
           }
 
           // Hidding isGlobal manually
@@ -78,8 +82,48 @@ registerPlugin(
     });
 
     registerContentAction({
+      label: `Custom Duplicate`,
+      showIf() {
+        return true;
+      },
+      async onClick() {
+        const clone = fastClone(appState.designerState.editingContentModel)
+        console.log('currentContent ', clone)
+        const modelName = appState.designerState.editingContentModel.modelName;
+
+        const cloneBlocks = clone?.data?.blocksString || null
+        appState.globalState.showGlobalBlockingLoading(`Duplicating entry...`);
+
+        console.log('caralho chegeui aqui ', clone?.data?.isGlobal)
+        const newData = {
+          ...clone?.data,
+          localeChildren: [],
+          parent: null,
+          blocks: (JSON.parse(cloneBlocks)?? []),
+        }
+        const payload = {
+          ...clone,
+          data: newData,
+          name: 'copy ' + clone.name,
+          isCopy: clone.id,
+        }
+        delete payload.id
+        const result = await createDuplicate(payload, privateKey, modelName);
+        if (result) {
+          appState.snackBar.show(`Page copy created. Click to see.`);
+        } else {
+          appState.snackBar.show(`Error creating copy. Contact your administrator`);
+        }
+
+        
+        appState.globalState.hideGlobalBlockingLoading();
+        }
+      },
+    );
+
+    registerContentAction({
       label: `Push for locale`,
-      showIf(content, model) {
+      showIf(content) {
         const isGlobal = fastClone(content?.data)?.isGlobal
         return isGlobal;
       },

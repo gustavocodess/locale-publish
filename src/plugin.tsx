@@ -172,10 +172,11 @@ registerPlugin(
       label: 'Push Component for Locales',
       showIf(selectedElements) {
         if (selectedElements.length === 1) {
-          const isGlobal = appState?.designerState?.editingContentModel?.data?.get("isGlobal");
-          // todo: maybe apply for multiple??
-          return isGlobal;
+          // const isGlobal = appState?.designerState?.editingContentModel?.data?.get("isGlobal");
+          // // todo: maybe applyl for multiple??
+          // return isGlobal;
         }
+        return false;
       },
       async onClick(elements) {
 

@@ -53,10 +53,10 @@ export function mergeLocalizedBlock(masterBlock: any, childrenBlock: any, locale
 
 }
 
-function localizeBlocksFromMaster(masterBlocks: BuilderBlock[], locale: string) {
+function localizeBlocks(blocks: BuilderBlock[], locale: string) {
   const newBlocks:BuilderBlock[] =  []
-  masterBlocks.forEach((block: BuilderBlock) => {
-    const blockToTraverse = {...masterBlocks}
+  blocks.forEach((block: BuilderBlock) => {
+    const blockToTraverse = {...blocks}
     // @ts-ignore next-line
     delete blockToTraverse.responsiveStyles
     // @ts-ignore next-line
@@ -100,7 +100,7 @@ export async function forcePushLocale(chidrenId: string, privateKey: string, api
   const childrenContent = await (await fetch(`https://cdn.builder.io/api/v3/content/${modelName}/${chidrenId}?apiKey=${apiKey}&cachebust=true&includeUnpublished=true`)).json();
 
   const childrenLocale = childrenContent?.query.filter((query: any) => query?.property === 'locale')[0]?.value[0]
-  const newBlocks = localizeBlocksFromMaster(masterBlocks, childrenLocale) 
+  const newBlocks = localizeBlocks(masterBlocks, childrenLocale)
   // creating final blocks based on master content only
   const finalBlocks = [...newBlocks.map((block: any) => ({...block, meta: {...block.meta, masterId: block.id}}))]
   const finalDataFields: any = localizeDataFromMaster(masterContent.data, childrenLocale)
@@ -133,8 +133,6 @@ export async function updateSingleLocale(chidrenId: string, parentId: string, pr
 
   // verify blocks that should not erase translation
   childrenContentBlocks = childrenContentBlocks.map((block: any) => {
-    // TODO: revert to repush logic
-  
     if (masterMap[block?.id]) {
       const newBlock = mergeLocalizedBlock(masterMap[block?.id], block, queryLocale?.value[0])
       return newBlock
@@ -142,35 +140,44 @@ export async function updateSingleLocale(chidrenId: string, parentId: string, pr
     return block;
   })
   // creating final blocks first based on master content only
-  let finalBlocks = [...masterBlocks.map((block: any) => ({...block, meta: {...block.meta, masterId: block.id}}))]
+  let finalBlocks = [
+    ...masterBlocks.map((block: any) => ({...block, meta: {...block.meta, masterId: block.id}}))
+  ]
+
+  // localizing master blocks
+  finalBlocks = localizeBlocks([...finalBlocks], queryLocale?.value[0])
 
   childrenContentBlocks?.forEach((childrenBlock: any, index: number) => {
     if (masterMap[childrenBlock.id]) {
       //  significa que o bloco existe no master, entao ja foi atualizado
       // !IMPORTANT: switch to new block with translations
-      const indexToReplace = findIndex(finalBlocks, (block: any) => block.id === childrenBlock.id)
-      finalBlocks[indexToReplace] = childrenBlock
+      const indexToReplace = findIndex(finalBlocks, (block: any) => block?.id === childrenBlock?.id)
+      const newBlock = mergeLocalizedBlock(masterMap[childrenBlock.id], childrenBlock, queryLocale?.value[0])
+      finalBlocks[indexToReplace] = newBlock
     } else if (!masterMap[childrenBlock.id] && !childrenBlock?.meta?.masterId) {
-    // significa que o bloco nao existe na master e nao veio da master antiga
-    finalBlocks = [...finalBlocks.slice(0, index), childrenBlock, ...finalBlocks.slice(index)]
+      // significa que o bloco nao existe na master e nao veio da master antiga
+      const newBlock = localizeBlocks([childrenBlock], queryLocale?.value[0])[0]
+      finalBlocks = [...finalBlocks.slice(0, index), newBlock, ...finalBlocks.slice(index)]
     }
   })
   // merge data fields (keep translation)
-  const finalDataFields: any = {...masterContent?.data}
-  Object.keys(masterContent?.data).map((key: string) => {
-    if (
-      masterContent?.data[key]?.['@type'] === '@builder.io/core:LocalizedValue' &&
-      childrenContent?.data[key]
-    ) {
-      if (masterContent?.data[key]?.Default === childrenContent?.data[key]?.Default) {
-        finalDataFields[key] = childrenContent?.data[key]
-      }
-      else {
-        deepSet(finalDataFields, key.concat(`.${queryLocale?.value[0]}`), masterContent?.data[key]?.Default, true)
-        deepSet(finalDataFields, key.concat('.Default'), masterContent?.data[key]?.Default, true)
-      }
-    }
-  })
+  const finalDataFields: any = {...childrenContent?.data}
+  // !IMPORTANT: below logic removed by request from Nishant
+  // ! data fields shoult not be updated on repush, only hard push
+  // Object.keys(masterContent?.data).map((key: string) => {
+  //   if (
+  //     masterContent?.data[key]?.['@type'] === '@builder.io/core:LocalizedValue' &&
+  //     childrenContent?.data[key]
+  //   ) {
+  //     if (masterContent?.data[key]?.Default === childrenContent?.data[key]?.Default) {
+  //       finalDataFields[key] = childrenContent?.data[key]
+  //     }
+  //     else {
+  //       deepSet(finalDataFields, key.concat(`.${queryLocale?.value[0]}`), masterContent?.data[key]?.Default, true)
+  //       deepSet(finalDataFields, key.concat('.Default'), masterContent?.data[key]?.Default, true)
+  //     }
+  //   }
+  // })
 
   // call write API to update the children with new blocks
   const result = await updateChildren(chidrenId, privateKey, finalBlocks, modelName, finalDataFields)
@@ -228,7 +235,7 @@ export async function pushToLocales(localesToPublish: string[], cloneContent: an
 
   const results = localesToPublish.map(async (locale: string) => {
     const masterBlocks = (JSON.parse(cloneContent?.data?.blocksString)?? []).map((block: any) => ({...block, meta: {...block.meta, masterId: block.id}}));
-    const newBlocks = localizeBlocksFromMaster(masterBlocks, locale)
+    const newBlocks = localizeBlocks(masterBlocks, locale)
     const masterData = cloneContent?.data
     const newData = localizeDataFromMaster(masterData, locale)
     const localeTarget = {

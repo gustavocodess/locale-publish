@@ -4,14 +4,14 @@ interface Payload {
   data: any;
 }
 
-export async function updateChildren(contentId: string, privateKey: string, newBlocks: any[], modelName: string, parentData: any, newQuery: any[] = []) {
+export async function updateChildren(contentId: string, privateKey: string, newBlocks: any[], modelName: string, dataFields: any, newQuery: any[] = []) {
   // !IMPORTANT: Remove all unwanted fields from parentData
-  delete parentData.isGlobal
-  delete parentData.localeChildren
-  delete parentData.parent
-  delete parentData.isMasterLocale
-  delete parentData.masterLanguage
-  delete parentData.blocks
+  delete dataFields.isGlobal
+  delete dataFields.localeChildren
+  delete dataFields.parent
+  delete dataFields.isMasterLocale
+  delete dataFields.masterLanguage
+  delete dataFields.blocks
 
   const newPayload: Payload = {
     // updates the url path for the locale
@@ -19,7 +19,7 @@ export async function updateChildren(contentId: string, privateKey: string, newB
       ...newQuery,
     ],
     data: {
-      ...parentData,
+      ...dataFields,
       blocks: newBlocks,
     }
   }

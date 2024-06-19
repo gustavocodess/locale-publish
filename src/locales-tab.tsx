@@ -3,9 +3,10 @@ import {
   Button,
 } from '@material-ui/core';
 import appState from '@builder.io/app-context';
-import { updateSingleLocale, forcePushLocale } from './locale-helpers';
+import { forcePushLocale, repushSingleLocale } from './locale-helpers';
 import LocaleItem from './locale-item';
 import { fastClone } from './plugin-helpers';
+import { getPushConfirmation } from './snackbar-utils';
 
 interface Props {
   privateKey: string;
@@ -36,15 +37,19 @@ const LocalesTab = (props: Props) => {
   };
 
   const handlePushChanges = async (childrenId: string) => {
-    const result = await updateSingleLocale(childrenId, parentId, privateKey, apiKey, modelName)
+    const result = await repushSingleLocale(childrenId, privateKey, apiKey, modelName)
     if (result.status === 200) {
       appState?.snackBar.show(`Suceessfully updated ${childrenId} with new blocks.`);
     }
   };
 
   const handlePushBatchChanges = async () => {
+    const response = await getPushConfirmation()
+    if (!response) {
+      return
+    }
     appState.globalState.showGlobalBlockingLoading(`Pushing changes for ${localeChildren.map((locale: any) => locale?.target?.value[0]).join(' & ')} ....`);
-    const results = localeChildren.map(async (locale: any) => await updateSingleLocale(locale?.reference?.id, parentId, privateKey, apiKey, modelName))
+    const results = localeChildren.map(async (locale: any) => await repushSingleLocale(locale?.reference?.id, privateKey, apiKey, modelName))
     const final = await Promise.all(results)
     await appState.globalState.hideGlobalBlockingLoading();
 

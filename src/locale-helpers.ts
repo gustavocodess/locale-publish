@@ -53,8 +53,8 @@ export function mergeLocalizedBlock(masterBlock: any, childrenBlock: any, locale
 
 }
 
-function localizeBlocks(blocks: BuilderBlock[], locale: string) {
-  const newBlocks:BuilderBlock[] =  []
+function localizeBlocks(blocks: any[], locale: string) {
+  const newBlocks:any[] =  []
   blocks.forEach((block: BuilderBlock) => {
     const blockToTraverse = {...blocks}
     // @ts-ignore next-line
@@ -100,6 +100,7 @@ export async function forcePushLocale(chidrenId: string, privateKey: string, api
   const childrenContent = await (await fetch(`https://cdn.builder.io/api/v3/content/${modelName}/${chidrenId}?apiKey=${apiKey}&cachebust=true&includeUnpublished=true`)).json();
 
   const childrenLocale = childrenContent?.query.filter((query: any) => query?.property === 'locale')[0]?.value[0]
+  const masterLocale = masterContent?.query.filter((query: any) => query?.property === 'locale')[0]?.value[0]
   const newBlocks = localizeBlocks(masterBlocks, childrenLocale)
   // creating final blocks based on master content only
   const finalBlocks = [...newBlocks.map((block: any) => ({...block, meta: {...block.meta, masterId: block.id}}))]
@@ -112,79 +113,94 @@ export async function forcePushLocale(chidrenId: string, privateKey: string, api
       ...queryLocale,
     }
   ]
+  
+  const name = `local from ${masterLocale} | ${masterContent.name} - ${childrenLocale}`
   // call write API to update the children with new blocks
-  const result = await updateChildren(chidrenId, privateKey, finalBlocks, modelName, finalDataFields, newQuery)
+  const result = await updateChildren(chidrenId, privateKey, finalBlocks, modelName, finalDataFields, newQuery, name)
   return result;
 }
 
-export async function updateSingleLocale(chidrenId: string, parentId: string, privateKey: string, apiKey: string, modelName: string) {
+export async function repushSingleLocale(chidrenId: string, privateKey: string, apiKey: string, modelName: string) {
   const masterContent = fastClone(appState?.designerState?.editingContentModel)
   const childrenContent = await (await fetch(`https://cdn.builder.io/api/v3/content/${modelName}/${chidrenId}?apiKey=${apiKey}&cachebust=true&includeUnpublished=true`)).json();
-  
   const masterBlocks = (JSON.parse(masterContent?.data?.blocksString)).filter((block: any) => !block?.id.includes('pixel'))
   let childrenContentBlocks = childrenContent?.data?.blocks?.filter((block: any) => !block?.id.includes('pixel'))
+  const localeToPush = childrenContent?.query?.find((query: any) => query?.property === 'locale')?.value[0]
 
-  const masterMap: any = {}
-  masterBlocks?.forEach((block: any) => {
-    masterMap[block.id] = block
+  const childrenTranlationsMap = <any>{}
+  childrenContentBlocks?.forEach((block: any) => {
+    traverse(block).map(function () {
+      const path = this.path.join('.')
+      // if (path.endsWith('Default') && path.includes('text')) {
+      if (path.endsWith('Default')) {
+        const getTranslation = deepGet(block, path.replace('Default', localeToPush))
+        const mapPath = block.id + '.' + path
+        childrenTranlationsMap[mapPath] = getTranslation ? getTranslation : deepGet(block, path)
+      }
+    })
   })
-
-  const queryLocale = childrenContent?.query?.find((query: any) => query?.property === 'locale')
-
-  // verify blocks that should not erase translation
-  childrenContentBlocks = childrenContentBlocks.map((block: any) => {
-    if (masterMap[block?.id]) {
-      const newBlock = mergeLocalizedBlock(masterMap[block?.id], block, queryLocale?.value[0])
-      return newBlock
-    }
-    return block;
-  })
+  // 
+  // console.log('childrenTranlationsMap ', childrenTranlationsMap)
   // creating final blocks first based on master content only
   let finalBlocks = [
     ...masterBlocks.map((block: any) => ({...block, meta: {...block.meta, masterId: block.id}}))
   ]
-
   // localizing master blocks
-  finalBlocks = localizeBlocks([...finalBlocks], queryLocale?.value[0])
+  finalBlocks = localizeBlocks([...finalBlocks], localeToPush)
+  const masterBlocksMap = <any>{}
+  finalBlocks.forEach((block: any) => {
+    masterBlocksMap[block.id] = block
+  })
 
   childrenContentBlocks?.forEach((childrenBlock: any, index: number) => {
-    if (masterMap[childrenBlock.id]) {
-      //  significa que o bloco existe no master, entao ja foi atualizado
-      // !IMPORTANT: switch to new block with translations
+    if (masterBlocksMap[childrenBlock.id]) {
+      // block exists on master, update its content
       const indexToReplace = findIndex(finalBlocks, (block: any) => block?.id === childrenBlock?.id)
-      const newBlock = mergeLocalizedBlock(masterMap[childrenBlock.id], childrenBlock, queryLocale?.value[0])
+      const newBlock = {...masterBlocksMap[childrenBlock.id]}
+      // apply translation if exists and if default value on master is the same
+      traverse(newBlock).map(function () {
+        const path = this.path.join('.')
+        const mapPath = childrenBlock.id + '.' + path
+        if (path.endsWith('Default') && childrenTranlationsMap[mapPath]) {
+          const defaultOnMaster = deepGet(masterBlocksMap[childrenBlock.id], path)
+          const defaultOnChildren = deepGet(childrenBlock, path)
+          let translatedValue = childrenTranlationsMap[mapPath]
+
+          // logic added because for nested columsn the final value is not a string
+          if (typeof defaultOnMaster === 'string' && defaultOnMaster !== defaultOnChildren) {
+            translatedValue = defaultOnMaster
+          } else {
+            const masterValue = JSON.stringify(defaultOnMaster)
+            const childrenValue = JSON.stringify(defaultOnChildren)
+            if (masterValue !== childrenValue) {
+              translatedValue = defaultOnMaster
+            }
+          }
+          deepSet(newBlock, path.replace('Default', localeToPush), translatedValue, true)
+        }
+      })
       finalBlocks[indexToReplace] = newBlock
-    } else if (!masterMap[childrenBlock.id] && !childrenBlock?.meta?.masterId) {
-      // significa que o bloco nao existe na master e nao veio da master antiga
-      const newBlock = localizeBlocks([childrenBlock], queryLocale?.value[0])[0]
-      finalBlocks = [...finalBlocks.slice(0, index), newBlock, ...finalBlocks.slice(index)]
+    } else {
+      // block doesnt exist on master, so
+      if (!childrenBlock?.meta?.masterId) {
+        // meands the block is new, so push to final blocks
+        const newBlock = {...childrenBlock}
+        finalBlocks = [...finalBlocks.slice(0, index), newBlock, ...finalBlocks.slice(index)]
+      } else {
+        // do nothing, block was deleted on master
+      }
     }
   })
-  // merge data fields (keep translation)
-  const finalDataFields: any = {...childrenContent?.data}
-  // !IMPORTANT: below logic removed by request from Nishant
-  // ! data fields shoult not be updated on repush, only hard push
-  // Object.keys(masterContent?.data).map((key: string) => {
-  //   if (
-  //     masterContent?.data[key]?.['@type'] === '@builder.io/core:LocalizedValue' &&
-  //     childrenContent?.data[key]
-  //   ) {
-  //     if (masterContent?.data[key]?.Default === childrenContent?.data[key]?.Default) {
-  //       finalDataFields[key] = childrenContent?.data[key]
-  //     }
-  //     else {
-  //       deepSet(finalDataFields, key.concat(`.${queryLocale?.value[0]}`), masterContent?.data[key]?.Default, true)
-  //       deepSet(finalDataFields, key.concat('.Default'), masterContent?.data[key]?.Default, true)
-  //     }
-  //   }
-  // })
 
+  // on repush, data fields should not be updated, only blocks
+  const finalDataFields: any = {...childrenContent?.data}
   // call write API to update the children with new blocks
   const result = await updateChildren(chidrenId, privateKey, finalBlocks, modelName, finalDataFields)
   return result;
+
 }
 
-
+// !IMPORTANT: DEPRECATED
 export async function updateSelectedElements(chidrenId: string, masterClone: any, privateKey: string, apiKey: string, modelName: string, elementToUpdate: any) {
   const childrenContent = await (await fetch(`https://cdn.builder.io/api/v3/content/${modelName}/${chidrenId}?apiKey=${apiKey}&cachebust=true&includeUnpublished=true`)).json();
 
@@ -228,8 +244,6 @@ export async function updateSelectedElements(chidrenId: string, masterClone: any
 }
 
 export async function pushToLocales(localesToPublish: string[], cloneContent: any, privateKey: string, modelName: string) {
-
-
   const createdEntries: any[] = []
   const currentLocaleTargets = getQueryLocales(appState?.designerState?.editingContentModel)
 
@@ -389,3 +403,33 @@ export const getLocaleOptionsForRole = () =>
     label: locale,
     value: locale,
   }));
+
+export function countWords() {
+  const stringsList: string[] = []
+  const stringsMap: Map<string, string> = new Map<string,string>()
+  const currentContent = fastClone(appState?.designerState?.editingContentModel)
+  const blocks = (JSON.parse(currentContent?.data?.blocksString)).filter((block: any) => !block?.id.includes('pixel'))
+
+  const locale = appState.designerState.activeLocale
+  blocks?.forEach((block: any) => {
+    traverse(block).map(function () {
+      const path = this.path.join('.')
+      const value = deepGet(block, path)
+      const localizedValue = deepGet(block, path.replace('Default', locale))
+      if (path.endsWith('.Default')
+        && (path.includes('title') || path.includes('text'))
+        && value && typeof value === 'string') {
+        stringsMap.set(block.id + '.' + path, localizedValue)
+        stringsList.push(localizedValue)
+      } else if (path.endsWith('text') && path.includes(locale) && value && typeof value === 'string') {
+        stringsMap.set(block.id + '.' + path, localizedValue)
+        stringsList.push(localizedValue)
+      } else if (path.toLowerCase().endsWith('text') && !path.includes('.Default') && value && typeof value === 'string') {
+        stringsMap.set(block.id + '.' + path, this.node)
+        stringsList.push(this.node)
+      } 
+    })
+  })
+  const wordsCount = stringsList.join(' ').split(' ').length
+  appState.snackBar.show(`Estimated words on content: ${wordsCount}.`);
+}

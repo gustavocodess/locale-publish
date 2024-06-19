@@ -2,9 +2,10 @@
 interface Payload {
   query?: any[];
   data: any;
+  name?: string;
 }
 
-export async function updateChildren(contentId: string, privateKey: string, newBlocks: any[], modelName: string, dataFields: any, newQuery: any[] = []) {
+export async function updateChildren(contentId: string, privateKey: string, newBlocks: any[], modelName: string, dataFields: any, newQuery: any[] = [], newName?: string) {
   // !IMPORTANT: Remove all unwanted fields from parentData
   delete dataFields.isGlobal
   delete dataFields.localeChildren
@@ -15,6 +16,7 @@ export async function updateChildren(contentId: string, privateKey: string, newB
 
   const newPayload: Payload = {
     // updates the url path for the locale
+    name: newName,
     query: [
       ...newQuery,
     ],
@@ -23,9 +25,11 @@ export async function updateChildren(contentId: string, privateKey: string, newB
       blocks: newBlocks,
     }
   }
-
   if (!newQuery.length) {
     delete newPayload.query
+  }
+  if (!newName) {
+    delete newPayload.name
   }
 
   const res2 = await fetch(

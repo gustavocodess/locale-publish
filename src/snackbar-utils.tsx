@@ -14,69 +14,7 @@ import {
   Button,
 } from '@material-ui/core';
 import { getLocaleOptionsForRole } from './locale-helpers';
-import MultiSelector from './MultiSelector';
-
-
-export function showPublishedNotification(locale: string, callback?: () => void) {
-  appState.snackBar.show(
-    <div css={{ display: 'flex', alignItems: 'center' }}>Published for {locale}</div>,
-    6000,
-    null,
-  );
-}
-
-export function showJobNotification(projectUid: string) {
-  appState.snackBar.show(
-    <div css={{ display: 'flex', alignItems: 'center' }}>Done!</div>,
-    2000,
-    <Button
-      color="primary"
-      css={{
-        pointerEvents: 'auto',
-        ...(appState.document.small && {
-          width: 'calc(100vw - 90px)',
-          marginRight: 45,
-          marginTop: 10,
-          marginBottom: 10,
-        }),
-      }}
-      variant="contained"
-      onClick={async () => {
-        const link = `https://cloud.memsource.com/web/project2/show/${projectUid}`;
-        window.open(link, '_blank');
-        appState.snackBar.open = false;
-      }}
-    >
-      Go to job details
-    </Button>
-  );
-}
-
-export function showOutdatedNotifications(callback: () => void) {
-  appState.snackBar.show(
-    <div css={{ display: 'flex', alignItems: 'center' }}>Contant has new strings!</div>,
-    6000,
-    <Button
-      color="primary"
-      css={{
-        pointerEvents: 'auto',
-        ...(appState.document.small && {
-          width: 'calc(100vw - 90px)',
-          marginRight: 45,
-          marginTop: 10,
-          marginBottom: 10,
-        }),
-      }}
-      variant="contained"
-      onClick={async () => {
-        callback();
-        appState.snackBar.open = false;
-      }}
-    >
-      Request an updated translation
-    </Button>
-  );
-}
+import MultiSelector from './components/MultiSelector';
 
 interface Props {
   onChoose: (val: { sourceLang: string; targetLangs: string[] } | null) => void;
@@ -90,23 +28,6 @@ interface ElementProps {
   deployedLocales: string[];
   elementsLength?: number;
 }
-const lsKey = 'phrase.sourceLang';
-
-const safeLsGet = (key: string) => {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-};
-
-const safeLsSet = (key: string, value: string) => {
-  try {
-    return localStorage.setItem(key, value);
-  } catch {
-    return null;
-  }
-};
 
 const LocaleConfigurationEditor: React.FC<Props> = props => {
   const store = useLocalStore(() => ({
@@ -115,15 +36,10 @@ const LocaleConfigurationEditor: React.FC<Props> = props => {
       const allowedLocales = getLocaleOptionsForRole().map((item: any) => item.value).filter((locale: any) => !locale.startsWith('Default'));
       return (
         allowedLocales
-        // appState.user.organization.value.customTargetingAttributes
-        //   ?.get('locale')
-        //   ?.toJSON()
-        //   .enum?.filter((locale: string) => locale !== store.sourceLang)
           .filter((item: string) => !props.deployedLocales.includes(item) && !props.currentLocaleTargets.includes(item)) || []
       );
     },
     sourceLang:
-      safeLsGet(lsKey) ||
       appState.user.organization.value.customTargetingAttributes?.get('locale')?.toJSON().enum[0],
   }));
 
@@ -160,7 +76,6 @@ const ElementConfigurationEditor: React.FC<ElementProps> = props => {
       return props.deployedLocales.filter((locale: any) => !locale.startsWith('Default'));
     },
     sourceLang:
-      safeLsGet(lsKey) ||
       appState.user.organization.value.customTargetingAttributes?.get('locale')?.toJSON().enum[0],
   }));
 
@@ -181,10 +96,6 @@ const ElementConfigurationEditor: React.FC<ElementProps> = props => {
             store.targetLangs = [...event.target.value];
           })}
         >
-          {/* <MenuItem key={`locale-all-45`} value="Push All">
-            <Checkbox color="primary" checked={store.all} onChange={() => store.all = !store.all} />
-            <ListItemText primary="Push All" />
-          </MenuItem> */}
           {
             store.availableLangs.map(locale => (
               <MenuItem key={locale} value={locale}>
@@ -207,6 +118,33 @@ const ElementConfigurationEditor: React.FC<ElementProps> = props => {
   ));
 };
 
+
+interface MultiPushProps {
+  onChoose: (push: boolean) => void;
+
+}
+
+const MultiLocalePushConfirm: React.FC<MultiPushProps> = props => {
+  return useObserver(() => (
+    <div css={{ margin: 20 }}>
+      <div css={{ marginTop: 8, marginBottom: 20 }}>
+        <Typography css={{fontWeight: 'bold', fontSize: 16 }}>Push to countries</Typography>
+      </div>
+      <div>
+        <Typography css={{ fontSize: 14 }}>Are you sure you want to push the changes to all countries?</Typography>
+      </div>
+      <DialogActions>
+        <Button onClick={() => props.onChoose(false)} color="default">
+          Cancel
+        </Button>
+        <Button variant="contained" onClick={() => props.onChoose(true)} color="primary">
+          Confirm
+        </Button>
+      </DialogActions>
+    </div>
+  ));
+};
+
 export async function getLangPicks(deployedLocales: string[], currentLocaleTargets: string[]): Promise<{
   sourceLang: string;
   targetLangs: string[];
@@ -216,6 +154,25 @@ export async function getLangPicks(deployedLocales: string[], currentLocaleTarge
       React.createElement(LocaleConfigurationEditor, {
         deployedLocales: deployedLocales,
         currentLocaleTargets: currentLocaleTargets,
+        onChoose: val => {
+          resolve(val);
+          destroy();
+        },
+      }),
+      true,
+      {
+        // dialogProps
+        disableBackdropClick: true,
+      },
+      () => resolve(null)
+    );
+  });
+}
+
+export async function getPushConfirmation(): Promise<{} | null> {
+  return new Promise(async resolve => {
+    const destroy = await appState.globalState.openDialog(
+      React.createElement(MultiLocalePushConfirm, {
         onChoose: val => {
           resolve(val);
           destroy();

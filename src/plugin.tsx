@@ -1,5 +1,4 @@
 import { registerCommercePlugin as registerPlugin } from '@builder.io/commerce-plugin-tools';
-import { reaction } from 'mobx'
 import { Builder } from '@builder.io/react';
 import pkg from '../package.json';
 import appState from '@builder.io/app-context';
@@ -15,6 +14,17 @@ import {
 import { getLangPicks, getLangsPushElement } from './snackbar-utils';
 import { pushToLocales, updateSelectedElements } from './locale-helpers';
 import { createDuplicate } from './locale-service';
+import WordsCountButton from './components/WordCounter';
+
+const WORD_COUNTER_NAME = 'Words counter'
+if (Builder.registry &&
+  !Builder.registry['editor.toolbarButton']?.filter(
+    (item: any) => item.name === WORD_COUNTER_NAME).length) {
+  Builder.register('editor.toolbarButton', {
+    name: WORD_COUNTER_NAME,
+    component: () => WordsCountButton(),
+  });
+}
 
 registerPlugin(
   {
@@ -103,15 +113,18 @@ registerPlugin(
           data: newData,
           name: 'copy ' + clone.name,
           isCopy: clone.id,
+          published: "draft",
         }
         delete payload.id
         const result = await createDuplicate(payload, privateKey, modelName);
-        if (result) {
-          appState.snackBar.show(`Page copy created. Click to see.`);
-        } else {
-          appState.snackBar.show(`Error creating copy. Contact your administrator`);
-        }
-
+        result.json().then((data: any) => {
+          if (data.id) {
+            appState.snackBar.show(`Page copy created. Redirecting...`);
+            appState.location.go(`/content/${data.id}`);
+          } else {
+            appState.snackBar.show(`Error creating copy. Contact your administrator`);
+          }
+        })
         
         appState.globalState.hideGlobalBlockingLoading();
         }
@@ -167,7 +180,6 @@ registerPlugin(
       },
     );
 
-
     registerContextMenuAction({
       label: 'Push Component for Locales',
       showIf(selectedElements) {
@@ -219,3 +231,4 @@ registerPlugin(
     return {};
   }
 );
+

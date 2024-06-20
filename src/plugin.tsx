@@ -66,7 +66,6 @@ registerPlugin(
             registerLocalesTab(privateKey);
             appState.designerState.editorOptions.disableTargetingFields = []
           }
-
           // Hidding isGlobal manually
           const { designerState } = appState;
           const { editingContentModel } = designerState;

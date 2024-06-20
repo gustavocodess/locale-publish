@@ -165,7 +165,6 @@ export async function repushSingleLocale(chidrenId: string, privateKey: string, 
           const defaultOnMaster = deepGet(masterBlocksMap[childrenBlock.id], path)
           const defaultOnChildren = deepGet(childrenBlock, path)
           let translatedValue = childrenTranlationsMap[mapPath]
-
           // logic added because for nested columsn the final value is not a string
           if (typeof defaultOnMaster === 'string' && defaultOnMaster !== defaultOnChildren) {
             translatedValue = defaultOnMaster

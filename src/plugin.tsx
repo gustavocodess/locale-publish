@@ -10,11 +10,14 @@ import {
   registerEditorOnLoad,
   registerLocalesTab,
   getQueryLocales,
+  tagMasterBlockOptions,
+  localizeBlocks,
 } from './plugin-helpers';
 import { getLangPicks, getLangsPushElement } from './snackbar-utils';
 import { pushToLocales, updateSelectedElements } from './locale-helpers';
 import { createDuplicate } from './locale-service';
 import WordsCountButton from './components/WordCounter';
+import traverse from 'traverse';
 
 const WORD_COUNTER_NAME = 'Words counter'
 if (Builder.registry &&
@@ -56,6 +59,10 @@ registerPlugin(
               appState.designerState.activeLocale = currentLocaleTargets[0]
             }
           }
+
+          // console.log('locales ', fastClone(appState.user.organization?.value.customTargetingAttributes))
+          // get('enum')
+
           // registering tab only once 
           const draftClone = fastClone(appState?.designerState?.editingContentModel);
           const isGlobal = draftClone?.data?.isGlobal
@@ -66,6 +73,18 @@ registerPlugin(
             registerLocalesTab(privateKey);
             appState.designerState.editorOptions.disableTargetingFields = []
           }
+
+          let currentBlocks = JSON.parse(draftClone?.data?.blocksString) || []
+          // console.log('blocks ', currentBlocks)
+
+          // currentBlocks = localizeBlocks(currentBlocks, 'Default')
+          currentBlocks = currentBlocks.map((block: any) => {
+            return tagMasterBlockOptions(block)
+          })
+          // console.log('blocks tagged', currentBlocks)
+
+          appState.designerState.editingContentModel.data.blocksString = JSON.stringify(currentBlocks)
+
           // Hidding isGlobal manually
           const { designerState } = appState;
           const { editingContentModel } = designerState;
@@ -76,7 +95,6 @@ registerPlugin(
           const newFields = editingContentModel?.useFields?.filter((field: any) => field.name !== 'isGlobal') || [];  
           appState.designerState.editingContentModel.useFields = [...newFields, ...isGlobalField];
           // end Hidding isGlobal manually
-
 
           return draftClone;
         },
@@ -149,9 +167,7 @@ registerPlugin(
         }
 
         const localeChildren = fastClone(appState.designerState.editingContentModel?.data?.get("localeChildren")?? [])
-
         const deployedLocales = localeChildren.map((locale: any) => locale?.target?.value[0])
-
         const picks = await getLangPicks(deployedLocales, currentLocaleTargets);
         const localesToPublish = picks?.targetLangs.map(e => e)
         if (!picks || !localesToPublish) {
@@ -210,8 +226,8 @@ registerPlugin(
         })
         const updates: any[]= []
         picks?.targetLangs?.map(async (pick: any) => {
-          const childrenId = localeMap[pick]?.reference?.id
-          const childrenModel = localeMap[pick]?.reference?.model
+          const childrenId = localeMap[pick]?.referenceId
+          const childrenModel = localeMap[pick]?.modelName
           updates.push(updateSelectedElements(childrenId, masterClone, privateKey, apiKey, childrenModel, elements[0]))
         })
 

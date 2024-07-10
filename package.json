@@ -1,6 +1,6 @@
 {
   "name": "@builder.io/locale-plugin",
-  "version": "0.0.26",
+  "version": "0.0.31",
   "description": "",
   "keywords": [],
   "main": "dist/plugin.system.js",

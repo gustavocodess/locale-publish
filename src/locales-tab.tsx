@@ -49,7 +49,7 @@ const LocalesTab = (props: Props) => {
       return
     }
     appState.globalState.showGlobalBlockingLoading(`Pushing changes for ${localeChildren.map((locale: any) => locale?.target?.value[0]).join(' & ')} ....`);
-    const results = localeChildren.map(async (locale: any) => await repushSingleLocale(locale?.reference?.id, privateKey, apiKey, modelName))
+    const results = localeChildren.map(async (locale: any) => await repushSingleLocale(locale?.referenceId, privateKey, apiKey, modelName))
     const final = await Promise.all(results)
     await appState.globalState.hideGlobalBlockingLoading();
 
@@ -73,10 +73,10 @@ const LocalesTab = (props: Props) => {
         localeChildren?.map((locale: any) => {
           return (
             <LocaleItem
-              key={`locale-item-${locale?.reference?.id}`}
+              key={`locale-item-${locale?.referenceId}`}
               item={locale}
-              onPush={() => handlePushChanges(locale?.reference?.id)}
-              onForcePush={() => handleForcePush(locale?.reference?.id)}
+              onPush={() => handlePushChanges(locale?.referenceId)}
+              onForcePush={() => handleForcePush(locale?.referenceId)}
             />
           )
         })

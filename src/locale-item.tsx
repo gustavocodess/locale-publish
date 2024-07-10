@@ -3,11 +3,12 @@ import { RemoveRedEye, Publish, Language, Code, SettingsRemote } from '@material
 import React from 'react';
 interface Props {
   item: {
-    reference: {
-      "@type": string;
-      model: string;
-      id: string;
-    }
+    // reference: {
+    //   "@type": string;
+    //   model: string;
+    //   id: string;
+    // }
+    referenceId: string;
     name: string;
     target: {
       "@type": string;
@@ -21,10 +22,10 @@ interface Props {
 
 const LocaleItem = (props: Props) => {
   const { item, onPush, onForcePush } = props
-  if (!item || !item?.reference) return null
+  if (!item || !item?.referenceId) return null
 
   return (
-    <div style={{ margin: 8 }} key={`item-${item?.reference?.id}`}>
+    <div style={{ margin: 8 }} key={`item-${item?.referenceId}`}>
       <Divider />
       <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
         <Typography style={{ fontSize: 16 }}>
@@ -42,7 +43,7 @@ const LocaleItem = (props: Props) => {
           <Tooltip enterDelay={100} title="View local page" placement="left">
             <IconButton
               css={{ position: 'absolute', top: 0, right: 0 }}
-              onClick={() => window.open(`https://builder.io/content/${item?.reference?.id}`, '_blank')}
+              onClick={() => window.open(`https://builder.io/content/${item?.referenceId}`, '_blank')}
             >
             <RemoveRedEye css={{ opacity: 0.7, fontSize: 20 }} />
           </IconButton>
@@ -50,7 +51,7 @@ const LocaleItem = (props: Props) => {
           <Tooltip enterDelay={100} title="Push for locale" placement="left">
             <IconButton
               css={{ position: 'absolute', top: 0, right: 0 }}
-              onClick={() =>  onPush(item?.reference?.id)}
+              onClick={() =>  onPush(item?.referenceId)}
             >
               <Publish css={{ opacity: 0.7, fontSize: 20 }} />
             </IconButton>
@@ -60,7 +61,7 @@ const LocaleItem = (props: Props) => {
         <Tooltip enterDelay={100} title="Force Re-Push" placement="left">
           <IconButton
             css={{ position: 'absolute', top: 0, right: 0 }}
-            onClick={() =>  onForcePush(item?.reference?.id)}
+            onClick={() =>  onForcePush(item?.referenceId)}
           >
             <SettingsRemote css={{ opacity: 0.7, fontSize: 20 }} />
           </IconButton>

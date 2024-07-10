@@ -10,8 +10,6 @@ import {
   registerEditorOnLoad,
   registerLocalesTab,
   getQueryLocales,
-  tagMasterBlockOptions,
-  localizeBlocks,
 } from './plugin-helpers';
 import { getLangPicks, getLangsPushElement } from './snackbar-utils';
 import { pushToLocales, updateSelectedElements } from './locale-helpers';
@@ -74,16 +72,8 @@ registerPlugin(
             appState.designerState.editorOptions.disableTargetingFields = []
           }
 
-          let currentBlocks = JSON.parse(draftClone?.data?.blocksString) || []
+          // const currentBlocks = JSON.parse(draftClone?.data?.blocksString) || []
           // console.log('blocks ', currentBlocks)
-
-          // currentBlocks = localizeBlocks(currentBlocks, 'Default')
-          currentBlocks = currentBlocks.map((block: any) => {
-            return tagMasterBlockOptions(block)
-          })
-          // console.log('blocks tagged', currentBlocks)
-
-          appState.designerState.editingContentModel.data.blocksString = JSON.stringify(currentBlocks)
 
           // Hidding isGlobal manually
           const { designerState } = appState;

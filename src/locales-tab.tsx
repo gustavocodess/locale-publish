@@ -5,8 +5,9 @@ import {
 import appState from '@builder.io/app-context';
 import { forcePushLocale, repushSingleLocale } from './locale-helpers';
 import LocaleItem from './locale-item';
-import { fastClone } from './plugin-helpers';
+import { fastClone, tagMasterBlockOptions } from './plugin-helpers';
 import { getPushConfirmation } from './snackbar-utils';
+import { pushBlocks } from './locale-service';
 
 interface Props {
   privateKey: string;
@@ -49,6 +50,11 @@ const LocalesTab = (props: Props) => {
       return
     }
     appState.globalState.showGlobalBlockingLoading(`Pushing changes for ${localeChildren.map((locale: any) => locale?.target?.value[0]).join(' & ')} ....`);
+    const masterContent = fastClone(appState?.designerState?.editingContentModel)
+    let masterBlocks = (JSON.parse(masterContent?.data?.blocksString)).filter((block: any) => !block?.id.includes('pixel'))
+    masterBlocks = masterBlocks.map((block: any) => (tagMasterBlockOptions(block)));
+    await pushBlocks(parentId, modelName, masterBlocks, privateKey)
+
     const results = localeChildren.map(async (locale: any) => await repushSingleLocale(locale?.referenceId, privateKey, apiKey, modelName))
     const final = await Promise.all(results)
     await appState.globalState.hideGlobalBlockingLoading();

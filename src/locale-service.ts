@@ -33,7 +33,7 @@ export async function updateChildren(contentId: string, privateKey: string, newB
   }
 
   const res2 = await fetch(
-    `https://builder.io/api/v1/write/${modelName}/${contentId}`,
+    `https://builder.io/api/v1/write/${modelName}/${contentId}?unsavedChange=true`,
     {
       method: 'PATCH',
       headers: {
@@ -71,6 +71,25 @@ export async function createDuplicate(newContent: any, privateKey: string, model
         'Authorization': `Bearer ${privateKey}`
       },
       body: JSON.stringify(newContent),
+    }
+  ).then(res => res);
+  return result;
+}
+
+export async function pushBlocks(entryId: string, modelName: string, blocks: any[], privateKey: string) {
+  const result = await fetch(
+    `https://builder.io/api/v1/write/${modelName}/${entryId}?unsavedChange=true`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${privateKey}`
+      },
+      body: JSON.stringify({
+        data: {
+          blocks,
+        }
+      }),
     }
   ).then(res => res);
   return result;

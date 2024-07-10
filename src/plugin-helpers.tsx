@@ -181,7 +181,7 @@ export function tagMasterBlockOptions(block: BuilderBlock) {
   traverse(newBlock).map(function () {
     const currentPath = this.path.join('.')
     const pathAbove = this.path.slice(0, -1)
-    if (pathAbove.join('.').endsWith('Default') && !currentPath.includes('gm_tag')) {
+    if (pathAbove.join('.').endsWith('Default') && !deepGet(newBlock, currentPath + '.gm_tag')) {
       deepSet(newBlock, currentPath + '.gm_tag', `_GL-${crypto.randomUUID()}`, true)
     }
   })

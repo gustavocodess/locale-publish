@@ -93,6 +93,66 @@ export async function forcePushLocale(chidrenId: string, privateKey: string, api
   // const res = await 
   return result;
 }
+export async function repushSingleLocale2(childId: string, privateKey: string, apiKey: string, modelName: string) {
+  const master = fastClone(appState?.designerState?.editingContentModel);
+  const child = await (await fetch(`https://cdn.builder.io/api/v3/content/${modelName}/${childId}?apiKey=${apiKey}&cachebust=true&includeUnpublished=true&cacheSeconds=1`)).json();
+
+  const masterBlocks = JSON.parse(master?.data?.blocksString).filter((block: any) => !block?.id.includes('pixel'));
+  const childBlocks = child?.data?.blocks?.filter((block: any) => !block?.id.includes('pixel'));
+  const resultBlocks: any = [];
+
+  const findChildBlockById = (id: any) => childBlocks.find((block: any) => block.id === id);
+
+  const mergeLocalizedValues = (masterValue: any, childValue: any) => {
+    if (masterValue?.['@type'] === '@builder.io/core:LocalizedValue') {
+      return {
+        ...masterValue,
+        ...childValue
+      };
+    }
+    return masterValue;
+  };
+
+  const mergeOptions = (masterOptions: any, childOptions: any) => {
+    const mergedOptions: any = { ...masterOptions, ...childOptions };
+
+    Object.keys(masterOptions).forEach((key) => {
+      if (typeof masterOptions[key] === 'object' && !Array.isArray(masterOptions[key])) {
+        mergedOptions[key] = mergeOptions(masterOptions[key], childOptions[key]);
+      } else {
+        mergedOptions[key] = mergeLocalizedValues(masterOptions[key], childOptions[key]);
+      }
+    });
+
+    return mergedOptions;
+  };
+
+  masterBlocks.forEach((masterBlock: any) => {
+    const childBlock = findChildBlockById(masterBlock.id);
+    if (childBlock) {
+      const mergedBlock = { ...masterBlock, ...childBlock };
+      mergedBlock.component.options = mergeOptions(masterBlock.component.options, childBlock.component.options);
+      resultBlocks.push(mergedBlock);
+    } else {
+      resultBlocks.push(masterBlock);
+    }
+  });
+
+  childBlocks.forEach((childBlock: any) => {
+    if (!masterBlocks.some((block: any) => block.id === childBlock.id)) {
+      resultBlocks.push(childBlock);
+    }
+  });
+
+  console.log('master blocks', masterBlocks);
+  console.log('child blocks', childBlocks);
+  console.log('result blocks', resultBlocks);
+
+  const finalDataFields: any = { ...child?.data };
+  const result = await updateChildren(childId, privateKey, resultBlocks, modelName, finalDataFields);
+  return result;
+}
+
 
 export async function repushSingleLocale(chidrenId: string, privateKey: string, apiKey: string, modelName: string) {
   const masterContent = fastClone(appState?.designerState?.editingContentModel)

@@ -4,7 +4,7 @@ import esbuild from 'rollup-plugin-esbuild';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
 import common from '@rollup/plugin-commonjs';
 import json from '@rollup/plugin-json';
-const SERVE = process.env.SERVE === 'true';
+const SERVE = process.env.ROLLUP_WATCH;
 
 const pkg = require('./package.json');
 

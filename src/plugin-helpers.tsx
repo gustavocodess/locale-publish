@@ -137,20 +137,32 @@ export const deepSet = (obj: any, path: string, value: any, create: boolean) => 
 }
 
 
-export function localizeBlocks(blocks: any[], locale: string) {
+export function localizeBlocks(masterBlocks: any[], locale: string, isRepush: boolean, childrenTranlationsMap: any) {
   const newBlocks:any[] =  []
-  blocks.forEach((block: BuilderBlock) => {
-    const blockToTraverse = {...blocks}
+  masterBlocks.forEach((block: BuilderBlock) => {
+    const blockToTraverse = {...masterBlocks}
     // @ts-ignore next-line
     delete blockToTraverse.responsiveStyles
     // @ts-ignore next-line
     delete blockToTraverse.meta
 
+  console.log('childrenTranlationsMap ', childrenTranlationsMap)
   traverse(block).map(function () {
     const path = this.path.join('.')
-    if (path.endsWith('Default')) {
-      const valueToTranslate = deepGet(block, path)
-      deepSet(block, path.replace('Default', locale), valueToTranslate, true)
+    if (isRepush) {
+      console.log('currentPath localizing ', path)
+      if (path.endsWith('Default') && childrenTranlationsMap[path.replaceAll('.Default', `.${locale}`)]) {
+        const valueToTranslate = deepGet(block, path)
+        // deepSet(block, path.replace('Default', locale), valueToTranslate, true)
+        deepSet(block, this.path.slice(0, -1).join('.') + `.${locale}`,valueToTranslate, true)
+      }
+    } else {
+      // works for first push and force push
+      if (path.endsWith('Default')) {
+        const valueToTranslate = deepGet(block, path)
+        // deepSet(block, path.replace('Default', locale), valueToTranslate, true)
+        deepSet(block, this.path.slice(0, -1).join('.') + `.${locale}`,valueToTranslate, true)
+      }
     }
   })
     newBlocks.push(block)
@@ -181,17 +193,31 @@ export function tagMasterBlockOptions(block: BuilderBlock) {
   traverse(newBlock).map(function () {
     const currentPath = this.path.join('.')
     const pathAbove = this.path.slice(0, -1)
-    if (pathAbove.join('.').endsWith('Default') && !deepGet(newBlock, currentPath + '.gm_tag')) {
+    if (
+      pathAbove.join('.').endsWith('Default')
+      && !deepGet(newBlock, currentPath + '.gm_tag')
+      && typeof this.node === 'object'
+      // ! why does not work?
+      //  && !this.node?.gm_tag
+      ) {
+        // && typeof this.node === 'object'
+      // && !deepGet(newBlock, currentPath + '.gm_tag') 
       deepSet(newBlock, currentPath + '.gm_tag', `_GL-${crypto.randomUUID()}`, true)
+      // ! why does not work?
+      // this.node = {
+      //   ...this.node,
+      //   gm_tag: `_GL-${crypto.randomUUID()}`
+      // }
     }
   })
+  // console.log('tagged block ', newBlock)
   return newBlock;
 }
 
 export const clearBlock = (block: any) => {
   const newBlock = {...block}
   traverse(newBlock).map(function () {
-    if (this.node === null || this.node === "" || this.node === undefined) {
+    if (this.node === null || this.node === undefined) {
       const path = this.path.join('.')
       delete newBlock[path]
     }

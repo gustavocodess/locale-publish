@@ -137,7 +137,6 @@ export async function repushSingleLocale(chidrenId: string, privateKey: string, 
       entireMasterPaths[block.id + '.' + path] = true
     })
   })
-  // console.log('entireMasterPaths ', entireMasterPaths)
 
   const localValuesOnly = <any>{}
   let addedPaths = 'random-string-to-avoid-empty-string'
@@ -190,12 +189,23 @@ export async function repushSingleLocale(chidrenId: string, privateKey: string, 
         }
       })
 
-
       // restore existing content in childrenOnly
       Object.keys(localValuesOnly).map((keyPath: string) => {
-        deepSet(newBlock, keyPath, localValuesOnly[keyPath], true)
+        const lastKey = keyPath.split('.').pop()
+        if (deepGet(newBlock, keyPath) && typeof Number(lastKey) === 'number') {
+          // it means that the value already exists on master and index is number,
+          // need to find next index available
+          let newIndex = Number(lastKey) + 1
+          let newPath = keyPath.split('.').slice(0, -1).join('.') + `.${newIndex}`
+          while (deepGet(newBlock, newPath)) {
+            newIndex++
+            newPath = keyPath.split('.').slice(0, -1).join('.') + `.${newIndex}`
+          }
+          deepSet(newBlock, newPath, localValuesOnly[keyPath], true)
+        } else {
+          deepSet(newBlock, keyPath, localValuesOnly[keyPath], true)
+        }
       })
-      // console.log('newblock after set', newBlock)
       finalBlocks[indexToReplace] = newBlock
     } else {
       // block doesnt exist on master, so
@@ -209,7 +219,7 @@ export async function repushSingleLocale(chidrenId: string, privateKey: string, 
     }
   })
 
-  // console.log('localValuesOnly ', localValuesOnly)
+  // console.log('localValuesOnly to restore', localValuesOnly)
 
   // on repush, data fields should not be updated, only blocks
   const finalDataFields: any = {...childrenContent?.data}
@@ -240,7 +250,6 @@ export async function updateSelectedElements(chidrenId: string, masterClone: any
     const elementIndex = childrenContentBlocks.findIndex((block: any) => block?.meta?.previousId === elementToUpdate?.id || block.id === elementToUpdate?.id)
     // TODO: instead of updating whole element, preserve existing translations on existing children (if exist)
     finalBlocks[elementIndex] = elementToAdd
-    // console.log('already existss ...', finalBlocks)
     return (await updateChildren(chidrenId, privateKey, finalBlocks, modelName, masterClone?.data))?.ok
   }
 

@@ -38,6 +38,11 @@ const LocalesTab = (props: Props) => {
   };
 
   const handlePushChanges = async (childrenId: string) => {
+    const masterContent = fastClone(appState?.designerState?.editingContentModel)
+    let masterBlocks = (JSON.parse(masterContent?.data?.blocksString)).filter((block: any) => !block?.id.includes('pixel'))
+    masterBlocks = masterBlocks.map((block: any) => (tagMasterBlockOptions(block)));
+    await pushBlocks(parentId, modelName, masterBlocks, privateKey)
+
     const result = await repushSingleLocale(childrenId, privateKey, apiKey, modelName)
     if (result.status === 200) {
       appState?.snackBar.show(`Suceessfully updated ${childrenId} with new blocks.`);

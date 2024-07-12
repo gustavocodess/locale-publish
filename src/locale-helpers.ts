@@ -1,7 +1,7 @@
 import traverse from "traverse";
 import appState from '@builder.io/app-context';
 import { pushBlocks, pushLocale, updateChildren } from "./locale-service";
-import { deepGet, deepSet, fastClone, getQueryLocales, localizeBlocks, localizeDataFromMaster, tagMasterBlockOptions } from "./plugin-helpers";
+import { clearBlock, deepGet, deepSet, fastClone, getQueryLocales, localizeBlocks, localizeDataFromMaster, tagMasterBlockOptions } from "./plugin-helpers";
 import { findIndex } from "lodash";
 interface BuilderBlock {
   responsiveStyles: any;
@@ -206,7 +206,7 @@ export async function repushSingleLocale(chidrenId: string, privateKey: string, 
           deepSet(newBlock, keyPath, localValuesOnly[keyPath], true)
         }
       })
-      finalBlocks[indexToReplace] = newBlock
+      finalBlocks[indexToReplace] = clearBlock(newBlock)
     } else {
       // block doesnt exist on master, so
       if (!childrenBlock?.meta?.masterId) {

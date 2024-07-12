@@ -187,3 +187,14 @@ export function tagMasterBlockOptions(block: BuilderBlock) {
   })
   return newBlock;
 }
+
+export const clearBlock = (block: any) => {
+  const newBlock = {...block}
+  traverse(newBlock).map(function () {
+    if (this.node === null || this.node === "" || this.node === undefined) {
+      const path = this.path.join('.')
+      delete newBlock[path]
+    }
+  })
+  return newBlock;
+}

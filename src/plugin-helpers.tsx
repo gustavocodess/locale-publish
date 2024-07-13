@@ -238,6 +238,7 @@ export const clearBlock = (block: any, childrenBlocks: any, locale: string) => {
         && (childrensMap[block.id] && deepGet(childrensMap[block.id], replaceAll(path, '.Default', `.${locale}`)) === undefined)
       )
     ) {
+      // console.log('deleting this ', replaceAll(path, '.Default', `.${locale}`), this.node)
       const lastKey = Number(path.split('.').pop())
       if (typeof lastKey === 'number') {
         // it means its an array

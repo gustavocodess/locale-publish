@@ -159,11 +159,13 @@ export async function repushSingleLocale(chidrenId: string, privateKey: string, 
       traverse(childrenBlock).map(function () {
         const currentPath = this.path.join('.')
         const pathAbove = this.path.slice(0, -1).join('.')
+        const elem = deepGet(childrenBlock, currentPath)
         if (
           !currentPath.includes('ComponentStyles')
           && pathAbove.endsWith(localeToPush)
-          && !this.node?.gm_tag
-          && typeof this.node === 'object'
+          // bg-BG.2
+          && elem !== undefined && !elem.gm_tag
+          && typeof elem === 'object'
           && !currentPath.includes(addedPaths)
         ) {
           localValuesOnly[currentPath] = this.node

@@ -1,12 +1,13 @@
 import { Builder, BuilderContent } from '@builder.io/react';
-import * as React from 'react';
+import React from 'react'
 import {
   Language,
 } from '@material-ui/icons';
 import LocalesTab from './locales-tab';
-import { Tooltip } from '@material-ui/core';
+import Tooltip from '@material-ui/core/Tooltip';
 import traverse from 'traverse';
 import { BuilderBlock } from '@builder.io/react/dist/types/src/components/builder-block.component';
+import { set, unset } from 'lodash';
 
 
 export type BulkAction = {
@@ -51,7 +52,9 @@ export function registerEditorOnLoad(reactionCallback: (actions: ContentEditorAc
 export function registerLocalesTab(privateKey: string) {
   Builder.register('editor.editTab', {
     name: (
+      // @ts-ignore next-line
       <Tooltip title="Locales">
+        {/* @ts-ignore next-line */}
         <Language style={{ fontSize: 20, marginRight: 6 }} />
       </Tooltip>
     ),
@@ -97,7 +100,7 @@ export const fastClone = (obj: any) =>
 
 export const deepGet = (obj: any, newPath: string) => {
   for (let i = 0, path = newPath.split('.'), len=path.length; i<len; i++){
-    if (path[i] && obj[path[i]]) {
+    if (path[i] && obj[path[i]] !== undefined) {
       obj = obj[path[i]];
     } else {
       // console.log('deepGet error: ', obj, newPath);
@@ -137,30 +140,31 @@ export const deepSet = (obj: any, path: string, value: any, create: boolean) => 
 }
 
 
-export function localizeBlocks(masterBlocks: any[], locale: string, isRepush: boolean, childrenTranlationsMap: any) {
+export function localizeBlocks(masterBlocks: any[], locale: string, isRepush: boolean, childrenTranlationsMap?: any) {
   const newBlocks:any[] =  []
   masterBlocks.forEach((block: BuilderBlock) => {
-    const blockToTraverse = {...masterBlocks}
     // @ts-ignore next-line
-    delete blockToTraverse.responsiveStyles
+    delete block.responsiveStyles
     // @ts-ignore next-line
-    delete blockToTraverse.meta
+    delete block.meta
 
-  console.log('childrenTranlationsMap ', childrenTranlationsMap)
   traverse(block).map(function () {
     const path = this.path.join('.')
     if (isRepush) {
-      console.log('currentPath localizing ', path)
-      if (path.endsWith('Default') && childrenTranlationsMap[path.replaceAll('.Default', `.${locale}`)]) {
+      if (path.endsWith('Default') && Boolean(childrenTranlationsMap[replaceAll(path, '.Default', `.${locale}`)])) {
         const valueToTranslate = deepGet(block, path)
         // deepSet(block, path.replace('Default', locale), valueToTranslate, true)
         deepSet(block, this.path.slice(0, -1).join('.') + `.${locale}`,valueToTranslate, true)
-      }
+      } else if (
+        path.endsWith('Default')
+        && childrenTranlationsMap[block?.id +'.' + replaceAll(path, '.Default', `.${locale}`)] === undefined) {
+        // deepSet(block, path, null, true)
+        unset(block, path)
+      } 
     } else {
       // works for first push and force push
       if (path.endsWith('Default')) {
         const valueToTranslate = deepGet(block, path)
-        // deepSet(block, path.replace('Default', locale), valueToTranslate, true)
         deepSet(block, this.path.slice(0, -1).join('.') + `.${locale}`,valueToTranslate, true)
       }
     }
@@ -177,6 +181,8 @@ export function localizeDataFromMaster(masterData: BuilderContent, locale: strin
   delete newData.blocksString
   // @ts-ignore next-line
   delete newData.blocks
+  // @ts-ignore next-line
+  delete newData.meta
 
   traverse(newData).map(function () {
     const path = this.path.join('.') 
@@ -214,13 +220,42 @@ export function tagMasterBlockOptions(block: BuilderBlock) {
   return newBlock;
 }
 
-export const clearBlock = (block: any) => {
-  const newBlock = {...block}
+export const clearBlock = (block: any, childrenBlocks: any, locale: string) => {
+  const childrensMap: Record<string, any> = {}
+  childrenBlocks.forEach((child: BuilderBlock) => {
+    // @ts-ignore next-line
+    childrensMap[child.id] = child
+  })
+  let newBlock = {...block}
   traverse(newBlock).map(function () {
-    if (this.node === null || this.node === undefined) {
-      const path = this.path.join('.')
-      delete newBlock[path]
+    const path = this.path.join('.')
+    const pathAbove = this.path.slice(0, -1).join('.')
+    if (this.node === null
+      || this.node === undefined
+      || (
+        (pathAbove.endsWith('Default'))
+        && typeof this.node === 'object'
+        && (childrensMap[block.id] && deepGet(childrensMap[block.id], replaceAll(path, '.Default', `.${locale}`)) === undefined)
+      )
+    ) {
+      const lastKey = Number(path.split('.').pop())
+      if (typeof lastKey === 'number') {
+        // it means its an array
+        const localPath = replaceAll(path, '.Default', `.${locale}`)
+        if (deepGet(newBlock, localPath)) {
+          const arrayPath = localPath.split('.').slice(0, -1).join('.')
+          const newArray = [...deepGet(newBlock, arrayPath)]
+          newArray.splice(lastKey, 1)
+          deepSet(newBlock, arrayPath, newArray, true)
+        }
+      } else {
+        unset(newBlock, replaceAll(path, '.Default', `.${locale}`))
+      }
     }
   })
   return newBlock;
+}
+
+export const replaceAll = (str: string, find: string, replace: string) => {
+  return str.replace(new RegExp(find, 'g'), replace)
 }

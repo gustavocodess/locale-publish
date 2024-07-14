@@ -36,6 +36,7 @@ export default {
   plugins: [
     replace({
       'process.env.NODE_ENV': JSON.stringify('production'),
+      '_DEVELOPER_':process.env.dev
     }),
     json(),
     nodeResolve({ mainFields: ['module', 'browser'] }),

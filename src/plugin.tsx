@@ -16,7 +16,7 @@ import { pushToLocales } from './locale-helpers';
 import { createDuplicate } from './locale-service';
 import WordsCountButton from './components/WordCounter';
 import traverse from 'traverse';
-
+const developer = '_DEVELOPER_';
 const WORD_COUNTER_NAME = 'Words counter'
 if (Builder.registry &&
   !Builder.registry['editor.toolbarButton']?.filter(
@@ -29,7 +29,7 @@ if (Builder.registry &&
 
 registerPlugin(
   {
-    name: 'Publish for Locale',
+    name: `${developer} Publish for Locale`,
     id: pkg.name,
     settings: [
       {
@@ -99,7 +99,7 @@ registerPlugin(
     });
 
     registerContentAction({
-      label: `Custom Duplicate`,
+      label: `${developer} Custom Duplicate`,
       showIf() {
         return true;
       },
@@ -139,8 +139,8 @@ registerPlugin(
     );
 
     registerContentAction({
-      label: `Push for locale`,
-      showIf(content) {
+      label: `${developer} Push for locale`,
+      showIf(content) {        
         const isGlobal = fastClone(content?.data)?.isGlobal
         return isGlobal;
       },

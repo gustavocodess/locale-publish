@@ -2,7 +2,7 @@ import traverse from "traverse";
 import appState from '@builder.io/app-context';
 import { pushBlocks, pushLocale, updateChildren } from "./locale-service";
 import { deepGet, deepSet, fastClone, getQueryLocales, localizeBlocks, localizeDataFromMaster, tagMasterBlockOptions } from "./plugin-helpers";
-import { findIndex } from "lodash";
+import { findIndex, update } from "lodash";
 interface BuilderBlock {
   responsiveStyles: any;
   meta: any;
@@ -93,66 +93,81 @@ export async function forcePushLocale(chidrenId: string, privateKey: string, api
   // const res = await 
   return result;
 }
+
+const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): BuilderElement[] => {
+  const masterMap = new Map<string, Tab>();
+
+  // Map master tabs by uniqueId
+  master.forEach((masterBlock) => {
+    masterBlock.component.options.tabs.forEach((tab: Tab) => {
+      if (tab.uniqueId) {
+        masterMap.set(tab.uniqueId, tab);
+      }
+    });
+  });
+
+  const mergedBlocks = child.map((childBlock) => {
+    const mergedTabs = childBlock.component.options.tabs.filter((childTab: Tab) => {
+      if (!childTab.uniqueId) {
+        return true;
+      }
+      return masterMap.has(childTab.uniqueId);
+    }).map((childTab: Tab) => {
+      if (childTab.uniqueId && masterMap.has(childTab.uniqueId)) {
+        return {
+          ...masterMap.get(childTab.uniqueId),
+          ...childTab,
+        };
+      }
+      return childTab;
+    });
+
+    // Add tabs from master that are not in child
+    master.forEach((masterBlock) => {
+      masterBlock.component.options.tabs.forEach((masterTab: Tab) => {
+        if (masterTab.uniqueId && !mergedTabs.find((tab) => tab.uniqueId === masterTab.uniqueId)) {
+          mergedTabs.push(masterTab);
+        }
+      });
+    });
+
+    return {
+      ...childBlock,
+      component: {
+        ...childBlock.component,
+        options: {
+          ...childBlock.component.options,
+          tabs: mergedTabs,
+        },
+      },
+    };
+  });
+
+  return mergedBlocks;
+};
+
 export async function repushSingleLocale2(childId: string, privateKey: string, apiKey: string, modelName: string) {
+
+  console.log('here2234');
+
   const master = fastClone(appState?.designerState?.editingContentModel);
   const child = await (await fetch(`https://cdn.builder.io/api/v3/content/${modelName}/${childId}?apiKey=${apiKey}&cachebust=true&includeUnpublished=true&cacheSeconds=1`)).json();
 
-  const masterBlocks = JSON.parse(master?.data?.blocksString).filter((block: any) => !block?.id.includes('pixel'));
+  let masterBlocks = JSON.parse(master?.data?.blocksString).filter((block: any) => !block?.id.includes('pixel'));
+  masterBlocks = addUniqueIds(masterBlocks);
+  await pushBlocks(master?.id, modelName, masterBlocks, privateKey)
+
   const childBlocks = child?.data?.blocks?.filter((block: any) => !block?.id.includes('pixel'));
-  const resultBlocks: any = [];
+  const resultBlocks: any = mergeBlocks(masterBlocks, childBlocks);
 
-  const findChildBlockById = (id: any) => childBlocks.find((block: any) => block.id === id);
-
-  const mergeLocalizedValues = (masterValue: any, childValue: any) => {
-    if (masterValue?.['@type'] === '@builder.io/core:LocalizedValue') {
-      return {
-        ...masterValue,
-        ...childValue
-      };
-    }
-    return masterValue;
-  };
-
-  const mergeOptions = (masterOptions: any, childOptions: any) => {
-    const mergedOptions: any = { ...masterOptions, ...childOptions };
-
-    Object.keys(masterOptions).forEach((key) => {
-      if (typeof masterOptions[key] === 'object' && !Array.isArray(masterOptions[key])) {
-        mergedOptions[key] = mergeOptions(masterOptions[key], childOptions[key]);
-      } else {
-        mergedOptions[key] = mergeLocalizedValues(masterOptions[key], childOptions[key]);
-      }
-    });
-
-    return mergedOptions;
-  };
-
-  masterBlocks.forEach((masterBlock: any) => {
-    const childBlock = findChildBlockById(masterBlock.id);
-    if (childBlock) {
-      const mergedBlock = { ...masterBlock, ...childBlock };
-      mergedBlock.component.options = mergeOptions(masterBlock.component.options, childBlock.component.options);
-      resultBlocks.push(mergedBlock);
-    } else {
-      resultBlocks.push(masterBlock);
-    }
-  });
-
-  childBlocks.forEach((childBlock: any) => {
-    if (!masterBlocks.some((block: any) => block.id === childBlock.id)) {
-      resultBlocks.push(childBlock);
-    }
-  });
-
-  console.log('master blocks', masterBlocks);
   console.log('child blocks', childBlocks);
+  console.log('master blocks',masterBlocks);
   console.log('result blocks', resultBlocks);
 
-  const finalDataFields: any = { ...child?.data };
-  const result = await updateChildren(childId, privateKey, resultBlocks, modelName, finalDataFields);
+  const childData: any = { ...child?.data };
+  const result = await updateChildren(childId, privateKey, resultBlocks, modelName, childData);
   return result;
 }
-
 
 export async function repushSingleLocale(chidrenId: string, privateKey: string, apiKey: string, modelName: string) {
   const masterContent = fastClone(appState?.designerState?.editingContentModel)
@@ -319,17 +334,54 @@ export async function updateSelectedElements(chidrenId: string, masterClone: any
   return (await updateChildren(chidrenId, privateKey, finalBlocks, modelName, masterClone?.data))?.ok
 }
 
+const addUniqueIds = (obj: any): any => {
+  const traverse = (current: any): any => {
+    if (Array.isArray(current)) {
+      return current.map((item) => {
+        if (typeof item === 'object' && item !== null) {
+          if (!item.uniqueId) {
+            item.uniqueId = generateUniqueId();
+          }
+          return { ...item, ...traverse(item) };
+        }
+        return item;
+      });
+    } else if (typeof current === 'object' && current !== null) {
+      let newObj: any = { ...current };
+      for (const key in current) {
+        if (current.hasOwnProperty(key) && key !== 'children') {
+          newObj[key] = traverse(current[key]);
+        }
+      }
+      return newObj;
+    }
+    return current;
+  };
+  return traverse(obj);
+};
+
+const generateUniqueId = (): string => {
+  return 'id-' + Math.random().toString(36).substr(2, 16);
+};
+
 export async function pushToLocales(localesToPublish: string[], cloneContent: any, privateKey: string, modelName: string) {
   const createdEntries: any[] = []
   const currentLocaleTargets = getQueryLocales(appState?.designerState?.editingContentModel)
   let masterBlocks = (JSON.parse(cloneContent?.data?.blocksString)?? []).map((block: any) => ({...block, meta: {...block.meta, masterId: block.id}}));
 
   // masterBlocks = localizeBlocks(masterBlocks, 'Default')
+  /*
   masterBlocks = masterBlocks.map((block: any) => {
     return tagMasterBlockOptions(block)
   })
   // updating master content with gm_tags
   await pushBlocks(cloneContent?.id, modelName, masterBlocks, privateKey)
+  */
+  /* @TODO: Move it and separate to not impact main function at all, its very risky function */
+  masterBlocks = addUniqueIds(masterBlocks);
+  await pushBlocks(cloneContent?.id, modelName, masterBlocks, privateKey)
+
+  /* ----------------- */
 
   const results = localesToPublish.map(async (locale: string) => {
     let newBlocks = localizeBlocks(masterBlocks, locale)

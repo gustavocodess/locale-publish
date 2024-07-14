@@ -370,18 +370,15 @@ export async function pushToLocales(localesToPublish: string[], cloneContent: an
   let masterBlocks = (JSON.parse(cloneContent?.data?.blocksString)?? []).map((block: any) => ({...block, meta: {...block.meta, masterId: block.id}}));
 
   // masterBlocks = localizeBlocks(masterBlocks, 'Default')
-  /*
   masterBlocks = masterBlocks.map((block: any) => {
     return tagMasterBlockOptions(block)
   })
   // updating master content with gm_tags
   await pushBlocks(cloneContent?.id, modelName, masterBlocks, privateKey)
-  */
-  /* @TODO: Move it and separate to not impact main function at all, its very risky function */
+
   masterBlocks = addUniqueIds(masterBlocks);
   await pushBlocks(cloneContent?.id, modelName, masterBlocks, privateKey)
 
-  /* ----------------- */
 
   const results = localesToPublish.map(async (locale: string) => {
     let newBlocks = localizeBlocks(masterBlocks, locale)

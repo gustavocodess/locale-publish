@@ -10,7 +10,7 @@ const fastClone = (obj: any) =>
   obj === undefined ? undefined : JSON.parse(JSON.stringify(obj));
 
 export async function repush(childId: string, privateKey: string, apiKey: string, modelName: string) {
-  console.log('Re-Push Scenario (Approach II), v40');
+  console.log('Debug: Re-Push Scenario (Approach II), v40');
 
   try {
     const master = fastClone(appState?.designerState?.editingContentModel);
@@ -24,14 +24,14 @@ export async function repush(childId: string, privateKey: string, apiKey: string
     const childBlocks = child?.data?.blocks?.filter((block: any) => !block?.id.includes('pixel'));
     let resultBlocks: any = mergeBlocks(masterBlocks, childBlocks);
 
-    console.log('get locales', child);
     const childLocale = getLocaleFromPage(child);
-    console.log('childLocale', childLocale);
     resultBlocks = duplicateDefaultValuesToLocaleValues(resultBlocks, childLocale);
 
-    console.log('child blocks', childBlocks);
-    console.log('master blocks', masterBlocks);
-    console.log('result blocks', resultBlocks);
+    console.log('Debug: child', child);
+    console.log('Debug: childLocale', childLocale);
+    console.log('Debug: childBlocks', childBlocks);
+    console.log('Debug: masterBlocks', masterBlocks);
+    console.log('Debug: resultBlocks', resultBlocks);
 
     const childData: any = { ...child?.data };
     const result = await updateChildren(childId, privateKey, resultBlocks, modelName, childData);

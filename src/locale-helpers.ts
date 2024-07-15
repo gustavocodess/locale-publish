@@ -278,8 +278,6 @@ export async function pushToLocales(localesToPublish: string[], cloneContent: an
 
   masterBlocks = addUniqueIdsInBlocks(masterBlocks);
   await pushBlocks(cloneContent?.id, modelName, masterBlocks, privateKey)
-  console.log('unique masterBlocks',masterBlocks);
-
 
   const results = localesToPublish.map(async (locale: string) => {
     let newBlocks = localizeBlocks(masterBlocks, locale)

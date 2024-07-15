@@ -116,12 +116,12 @@ export const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): 
           const lastMaster = snapshot ? JSON.parse(atob(snapshot)) : [];
           const existsInLastMaster = lastMaster.some((snapshotItem: any) => snapshotItem.uniqueId === masterItem.uniqueId);
 
-          console.log('processing', masterItem.uniqueId);
-          console.log('lastSnapshot', snapshot);
-          console.log('lastMaster', lastMaster);
+          console.log('Debug: Processing element in list', masterItem.uniqueId);
+          console.log('Debug: lastSnapshot', snapshot);
+          console.log('Debug: lastMaster', lastMaster);
 
           if (!existsInLastMaster) {
-            console.log('unwanted scenario', masterItem.uniqueId);
+            console.log('Debug: Unwanted scenario', masterItem.uniqueId);
             result.push(masterItem);
           }
         }
@@ -179,8 +179,8 @@ export const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): 
                 const masterSnapshot = btoa(JSON.stringify(matchingMasterBlock.component.options[key]));
                 updatedOptions[snapshotKey] = masterSnapshot;
 
-                console.log(`new snapshot for ${key}`, masterSnapshot);
-                console.log(`new snapshot json for ${key}`, matchingMasterBlock.component.options[key]);
+                console.log(`Debug: new snapshot for ${key}`, masterSnapshot);
+                console.log(`Debug: new snapshot json for ${key}`, matchingMasterBlock.component.options[key]);
               }
             }
           });

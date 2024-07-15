@@ -98,38 +98,6 @@ export async function forcePushLocale(chidrenId: string, privateKey: string, api
   return result;
 }
 
-// TK --------
-
-
-
-  export async function repushSingleLocale2(childId: string, privateKey: string, apiKey: string, modelName: string) {
-
-  console.log('Re-Push Scenario, v39');
-
-  const master = fastClone(appState?.designerState?.editingContentModel);
-  const child = await (await fetch(`https://cdn.builder.io/api/v3/content/${modelName}/${childId}?apiKey=${apiKey}&cachebust=true&includeUnpublished=true&cacheSeconds=1`)).json();
-
-  let masterBlocks = JSON.parse(master?.data?.blocksString).filter((block: any) => !block?.id.includes('pixel'));
-  masterBlocks = addUniqueIdsInBlocks(masterBlocks);
-  await pushBlocks(master?.id, modelName, masterBlocks, privateKey)
-
-  const childBlocks = child?.data?.blocks?.filter((block: any) => !block?.id.includes('pixel'));
-  let resultBlocks: any = mergeBlocks(masterBlocks, childBlocks);
-
-  console.log('get locales',child);
-  const childLocale = getLocaleFromPage(child);
-  console.log('childLocale',childLocale);
-  resultBlocks = duplicateDefaultValuesToLocaleValues(resultBlocks, childLocale);
-
-  console.log('child blocks', childBlocks);
-  console.log('master blocks',masterBlocks);
-  console.log('result blocks', resultBlocks);
-
-  const childData: any = { ...child?.data };
-  const result = await updateChildren(childId, privateKey, resultBlocks, modelName, childData);
-  return result;
-}
-
 export async function repushSingleLocale(chidrenId: string, privateKey: string, apiKey: string, modelName: string) {
   const masterContent = fastClone(appState?.designerState?.editingContentModel)
   const childrenContent = await (await fetch(`https://cdn.builder.io/api/v3/content/${modelName}/${chidrenId}?apiKey=${apiKey}&cachebust=true&includeUnpublished=true&cacheSeconds=1`)).json();

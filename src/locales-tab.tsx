@@ -3,11 +3,13 @@ import {
   Button,
 } from '@material-ui/core';
 import appState from '@builder.io/app-context';
-import { forcePushLocale, repushSingleLocale, repushSingleLocale2 } from './locale-helpers';
+import { forcePushLocale, repushSingleLocale } from './locale-helpers';
 import LocaleItem from './locale-item';
 import { fastClone, tagMasterBlockOptions } from './plugin-helpers';
 import { getPushConfirmation } from './snackbar-utils';
 import { pushBlocks } from './locale-service';
+
+import { repush } from "./services/repush";
 
 interface Props {
   privateKey: string;
@@ -37,6 +39,7 @@ const LocalesTab = (props: Props) => {
     await appState.globalState.hideGlobalBlockingLoading();
   };
 
+  // Approach I - in ./locales-helpers.ts
   const handlePushChanges = async (childrenId: string) => {
     const result = await repushSingleLocale(childrenId, privateKey, apiKey, modelName)
     if (result.status === 200) {
@@ -44,8 +47,9 @@ const LocalesTab = (props: Props) => {
     }
   };
 
+  // Approach II - in ./services/repush.ts
   const handlePushChanges2 = async (childrenId: string) => {
-    const result = await repushSingleLocale2(childrenId, privateKey, apiKey, modelName)
+    const result = await repush(childrenId, privateKey, apiKey, modelName)
     if (result.status === 200) {
       appState?.snackBar.show(`Suceessfully updated ${childrenId} with new blocks.`);
     }

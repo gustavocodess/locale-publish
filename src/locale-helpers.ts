@@ -3,7 +3,9 @@ import appState from '@builder.io/app-context';
 import { pushBlocks, pushLocale, updateChildren } from "./locale-service";
 import { deepGet, deepSet, fastClone, getQueryLocales, localizeBlocks, localizeDataFromMaster, tagMasterBlockOptions } from "./plugin-helpers";
 import { findIndex, update } from "lodash";
+
 import { duplicateDefaultValuesToLocaleValues, getLocaleFromPage } from './utils/locales';
+import { addUniqueIdsInBlocks, mergeBlocks} from "./utils/blocks";
 
 interface BuilderBlock {
   responsiveStyles: any;
@@ -98,188 +100,17 @@ export async function forcePushLocale(chidrenId: string, privateKey: string, api
 
 // TK --------
 
-const generateUniqueId = (): string => {
-  return 'id-' + Math.random().toString(36).substr(2, 16);
-};
-
-const addUniqueIds = (obj: any): any => {
-  const traverse = (current: any, parent: any = null, propertyName: string = ''): any => {
-    if (Array.isArray(current)) {
-      const updatedArray = current.map((item) => {
-        if (typeof item === 'object' && item !== null) {
-          if (!item.uniqueId) {
-            item.uniqueId = generateUniqueId();
-          }
-          return { ...item, ...traverse(item) };
-        }
-        return item;
-      });
-      if (parent && propertyName) {
-        parent[`${propertyName}_masterSnapshot`] = btoa(JSON.stringify(updatedArray));
-      }
-      return updatedArray;
-    } else if (typeof current === 'object' && current !== null) {
-      let newObj: any = { ...current };
-      for (const key in current) {
-        if (current.hasOwnProperty(key) && key !== 'children') {
-          newObj[key] = traverse(current[key], newObj, key);
-        }
-      }
-      return newObj;
-    }
-    return current;
-  };
-
-  const addUniqueIdToComponent = (block: BuilderElement): BuilderElement => {
-    if (!block.component.options.uniqueId) {
-      block.component.options.uniqueId = generateUniqueId();
-    }
-    block.component.options = traverse(block.component.options);
-    return block;
-  };
-
-  if (Array.isArray(obj)) {
-    return obj.map(addUniqueIdToComponent);
-  } else {
-    return addUniqueIdToComponent(obj);
-  }
-};
-
-const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): BuilderElement[] => {
-  const masterMap = new Map<string, any>();
-
-  // Flatten and map master elements by options.uniqueId
-  master.forEach((masterBlock) => {
-    if (masterBlock.component.options.uniqueId) {
-      masterMap.set(masterBlock.component.options.uniqueId, masterBlock);
-    }
-
-    const flattenAndMap = (obj: any) => {
-      if (Array.isArray(obj)) {
-        obj.forEach((item) => {
-          if (item.uniqueId) {
-            masterMap.set(item.uniqueId, item);
-          }
-          flattenAndMap(item);
-        });
-      } else if (typeof obj === 'object' && obj !== null) {
-        for (const key in obj) {
-          if (obj.hasOwnProperty(key) && key !== 'children') {
-            flattenAndMap(obj[key]);
-          }
-        }
-      }
-    };
-
-    flattenAndMap(masterBlock.component.options);
-  });
-
-  const mergeArrays = (masterArray: any[], childArray: any[], snapshot: any, snapshotKey: string): any[] => {
-    const childUniqueIds = new Set(childArray.map((childItem: any) => childItem.uniqueId));
-
-    const result = childArray.map((childItem: any) => {
-      if (childItem.uniqueId && masterMap.has(childItem.uniqueId)) {
-        return {
-          ...masterMap.get(childItem.uniqueId),
-          ...childItem,
-        };
-      }
-      return childItem;
-    });
-
-    masterArray.forEach((masterItem: any) => {
-      if (masterItem.uniqueId && !childUniqueIds.has(masterItem.uniqueId)) {
-        // That condition includes Scenario of unwanted Element which shouldn't be pushed'
-        console.log('processing',masterItem.uniqueId);
-        console.log('lastSnapshot',snapshot);
-        const lastMaster = snapshot ? JSON.parse(atob(snapshot)) : [];
-        console.log('lastMaster',lastMaster);
-        const existsInLastMaster = lastMaster.some((snapshotItem: any) => snapshotItem.uniqueId === masterItem.uniqueId);
-
-        if (!existsInLastMaster) {
-          console.log('unwanted scenario',masterItem.uniqueId);
-          result.push(masterItem);
-
-        }
-      }
-    });
-
-    return result;
-  };
-
-  let mergedBlocks = master.map((masterBlock) => {
-    const matchingChildBlock = child.find((childBlock) => childBlock.id === masterBlock.id);
-    if (matchingChildBlock) {
-      const mergedOptions = { ...matchingChildBlock.component.options };
-
-      Object.keys(mergedOptions).forEach((key) => {
-        if (Array.isArray(mergedOptions[key])) {
-          const masterArray = masterBlock.component.options[key] || [];
-          const snapshotKey = `${key}_masterSnapshot`;
-          const snapshot = matchingChildBlock.component.options[snapshotKey];
-
-          mergedOptions[key] = mergeArrays(masterArray, mergedOptions[key], snapshot, snapshotKey);
-        }
-      });
-
-      return {
-        ...masterBlock,
-        component: {
-          ...masterBlock.component,
-          options: mergedOptions,
-        },
-      };
-    }
-    return masterBlock;
-  });
-
-  // Append child blocks that are not present in the master
-  child.forEach((childBlock) => {
-    if (!childBlock.component.options.uniqueId || masterMap.has(childBlock.component.options.uniqueId)) {
-      if (!mergedBlocks.find((block) => block.id === childBlock.id)) {
-        mergedBlocks.push(childBlock);
-      }
-    }
-  });
-
-  mergedBlocks = mergedBlocks.map((block) => {
-    const matchingMasterBlock = master.find((masterBlock) => masterBlock.id === block.id);
-    if (matchingMasterBlock) {
-      const updatedOptions = { ...block.component.options };
-      Object.keys(updatedOptions).forEach((key) => {
-        if (Array.isArray(updatedOptions[key])) {
-          const snapshotKey = `${key}_masterSnapshot`;
-          const masterSnapshot = btoa(JSON.stringify(matchingMasterBlock.component.options[key]));
-          updatedOptions[snapshotKey] = masterSnapshot;
-          console.log('new snapshot',masterSnapshot);
-          console.log('new snapshot json',matchingMasterBlock.component.options[key]);
-        }
-      });
-
-      return {
-        ...block,
-        component: {
-          ...block.component,
-          options: updatedOptions,
-        },
-      };
-    }
-    return block;
-  });
-
-  return mergedBlocks;
-};
 
 
   export async function repushSingleLocale2(childId: string, privateKey: string, apiKey: string, modelName: string) {
 
-  console.log('Re-Push Scenario, v35');
-  
+  console.log('Re-Push Scenario, v39');
+
   const master = fastClone(appState?.designerState?.editingContentModel);
   const child = await (await fetch(`https://cdn.builder.io/api/v3/content/${modelName}/${childId}?apiKey=${apiKey}&cachebust=true&includeUnpublished=true&cacheSeconds=1`)).json();
 
   let masterBlocks = JSON.parse(master?.data?.blocksString).filter((block: any) => !block?.id.includes('pixel'));
-  masterBlocks = addUniqueIds(masterBlocks);
+  masterBlocks = addUniqueIdsInBlocks(masterBlocks);
   await pushBlocks(master?.id, modelName, masterBlocks, privateKey)
 
   const childBlocks = child?.data?.blocks?.filter((block: any) => !block?.id.includes('pixel'));
@@ -477,7 +308,7 @@ export async function pushToLocales(localesToPublish: string[], cloneContent: an
   // updating master content with gm_tags
   await pushBlocks(cloneContent?.id, modelName, masterBlocks, privateKey)
 
-  masterBlocks = addUniqueIds(masterBlocks);
+  masterBlocks = addUniqueIdsInBlocks(masterBlocks);
   await pushBlocks(cloneContent?.id, modelName, masterBlocks, privateKey)
   console.log('unique masterBlocks',masterBlocks);
 

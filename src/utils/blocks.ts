@@ -130,31 +130,48 @@ export const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): 
       return result;
     };
 
+    const mergeObjects = (masterObject: any, childObject: any): any => {
+      const mergedObject = { ...childObject };
+
+      Object.keys(childObject).forEach((key) => {
+        if (Array.isArray(childObject[key])) {
+          const masterArray = masterObject?.[key] || [];
+          const snapshotKey = `${key}_masterSnapshot`;
+          const snapshot = childObject[snapshotKey];
+          mergedObject[key] = mergeArrays(masterArray, childObject[key], snapshot, snapshotKey);
+        } else if (typeof childObject[key] === 'object' && childObject[key] !== null) {
+          const snapshotKey = `${key}_masterSnapshot`;
+          const snapshot = childObject[snapshotKey];
+          if (snapshot) {
+            const decodedSnapshot = JSON.parse(atob(snapshot));
+            if (JSON.stringify(childObject[key]) === JSON.stringify(decodedSnapshot)) {
+              mergedObject[key] = masterObject?.[key];
+            } else {
+              mergedObject[key] = mergeObjects(masterObject?.[key] || {}, childObject[key]);
+            }
+          } else {
+            mergedObject[key] = mergeObjects(masterObject?.[key] || {}, childObject[key]);
+          }
+        } else if (typeof childObject[key] !== 'undefined' && !Array.isArray(childObject[key])) {
+          const snapshotKey = `${key}_masterSnapshot`;
+          const snapshot = childObject[snapshotKey];
+
+          if (snapshot) {
+            const decodedSnapshot = JSON.parse(atob(snapshot));
+            if (childObject[key] === decodedSnapshot) {
+              mergedObject[key] = masterObject?.[key];
+            }
+          }
+        }
+      });
+
+      return mergedObject;
+    };
+
     let mergedBlocks = child.map((childBlock) => {
       const matchingMasterBlock = master.find((masterBlock) => masterBlock.id === childBlock.id);
       if (matchingMasterBlock && matchingMasterBlock.component && matchingMasterBlock.component.options) {
-        const mergedOptions = { ...childBlock?.component?.options };
-
-        Object.keys(mergedOptions).forEach((key) => {
-          if (Array.isArray(mergedOptions[key])) {
-            const masterArray = matchingMasterBlock?.component?.options[key] || [];
-            const snapshotKey = `${key}_masterSnapshot`;
-
-            if (!childBlock?.component) return;
-            const snapshot = childBlock.component.options[snapshotKey];
-            mergedOptions[key] = mergeArrays(masterArray, mergedOptions[key], snapshot, snapshotKey);
-          } else if (typeof mergedOptions[key] !== 'object' && typeof mergedOptions[key] !== 'undefined' && !Array.isArray(mergedOptions[key])) {
-            const snapshotKey = `${key}_masterSnapshot`;
-            const snapshot = childBlock?.component?.options[snapshotKey];
-
-            if (snapshot) {
-              const decodedSnapshot = JSON.parse(atob(snapshot));
-              if (mergedOptions[key] === decodedSnapshot) {
-                mergedOptions[key] = matchingMasterBlock?.component?.options[key];
-              }
-            }
-          }
-        });
+        const mergedOptions = mergeObjects(matchingMasterBlock.component.options, childBlock.component.options);
 
         return {
           ...childBlock,
@@ -173,30 +190,63 @@ export const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): 
       }
     });
 
+    const updateOptionsWithSnapshots = (updatedOptions: any, masterOptions: any): any => {
+      const newOptions = { ...updatedOptions };
+
+      Object.keys(newOptions).forEach((key) => {
+        const snapshotKey = `${key}_masterSnapshot`;
+        const snapshot = newOptions[snapshotKey];
+
+        if (Array.isArray(newOptions[key])) {
+          // Handle array elements recursively
+          newOptions[key] = newOptions[key].map((item: any, index: number) => {
+            if (typeof item === 'object' && item !== null) {
+              return updateOptionsWithSnapshots(item, masterOptions?.[key]?.[index]);
+            }
+            return item;
+          });
+
+          // Update the snapshot for the array
+          const masterSnapshot = btoa(JSON.stringify(masterOptions?.[key]));
+          newOptions[snapshotKey] = masterSnapshot;
+
+        } else if (typeof newOptions[key] === 'object' && newOptions[key] !== null) {
+          // Handle nested objects recursively
+          if (snapshot) {
+            const decodedSnapshot = JSON.parse(atob(snapshot));
+            if (JSON.stringify(newOptions[key]) === JSON.stringify(decodedSnapshot)) {
+              newOptions[key] = masterOptions?.[key];
+            } else {
+              newOptions[key] = updateOptionsWithSnapshots(newOptions[key], masterOptions?.[key]);
+            }
+          } else {
+            newOptions[key] = updateOptionsWithSnapshots(newOptions[key], masterOptions?.[key]);
+          }
+
+        } else {
+          // Handle primitive values
+          if (snapshot) {
+            const decodedSnapshot = JSON.parse(atob(snapshot));
+            if (newOptions[key] === decodedSnapshot) {
+              newOptions[key] = masterOptions?.[key];
+            }
+          }
+
+          // Update the snapshot for primitive values
+          if (masterOptions && masterOptions.hasOwnProperty(key)) {
+            newOptions[snapshotKey] = btoa(JSON.stringify(masterOptions[key]));
+          }
+        }
+      });
+
+      return newOptions;
+    };
+
     mergedBlocks = mergedBlocks.map((block) => {
       const matchingMasterBlock = master.find((masterBlock) => masterBlock.id === block.id);
       if (matchingMasterBlock && matchingMasterBlock.component && matchingMasterBlock.component.options) {
         if (block.component && block.component.options) {
-          const updatedOptions = { ...block.component.options };
-          Object.keys(updatedOptions).forEach((key) => {
-            if (Array.isArray(updatedOptions[key])) {
-              if (matchingMasterBlock.component) {
-                const snapshotKey = `${key}_masterSnapshot`;
-                const masterSnapshot = btoa(JSON.stringify(matchingMasterBlock.component.options[key]));
-                updatedOptions[snapshotKey] = masterSnapshot;
-              }
-            } else if (typeof updatedOptions[key] !== 'object' && typeof updatedOptions[key] !== 'undefined' && !Array.isArray(updatedOptions[key])) {
-              const snapshotKey = `${key}_masterSnapshot`;
-              const snapshot = block?.component?.options[snapshotKey];
-
-              if (snapshot) {
-                const decodedSnapshot = JSON.parse(atob(snapshot));
-                if (updatedOptions[key] === decodedSnapshot) {
-                  updatedOptions[key] = matchingMasterBlock?.component?.options[key];
-                }
-              }
-            }
-          });
+          const updatedOptions = updateOptionsWithSnapshots({ ...block.component.options }, matchingMasterBlock.component.options);
 
           return {
             ...block,

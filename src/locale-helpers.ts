@@ -94,59 +94,144 @@ export async function forcePushLocale(chidrenId: string, privateKey: string, api
   return result;
 }
 
-const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): BuilderElement[] => {
-  const masterMap = new Map<string, Tab>();
+// TK --------
 
-  // Map master tabs by uniqueId
-  master.forEach((masterBlock) => {
-    masterBlock.component.options.tabs.forEach((tab: Tab) => {
-      if (tab.uniqueId) {
-        masterMap.set(tab.uniqueId, tab);
+const addUniqueIds = (obj: any): any => {
+  const traverse = (current: any): any => {
+    if (Array.isArray(current)) {
+      return current.map((item) => {
+        if (typeof item === 'object' && item !== null) {
+          if (!item.uniqueId) {
+            item.uniqueId = generateUniqueId();
+          }
+          return { ...item, ...traverse(item) };
+        }
+        return item;
+      });
+    } else if (typeof current === 'object' && current !== null) {
+      let newObj: any = { ...current };
+      for (const key in current) {
+        if (current.hasOwnProperty(key) && key !== 'children') {
+          newObj[key] = traverse(current[key]);
+        }
       }
-    });
+      return newObj;
+    }
+    return current;
+  };
+
+  const addUniqueIdToComponent = (block: BuilderElement): BuilderElement => {
+    if (!block.component.options.uniqueId) {
+      block.component.options.uniqueId = generateUniqueId();
+    }
+    block.component.options = traverse(block.component.options);
+    return block;
+  };
+
+  if (Array.isArray(obj)) {
+    return obj.map(addUniqueIdToComponent);
+  } else {
+    return addUniqueIdToComponent(obj);
+  }
+};
+
+const generateUniqueId = (): string => {
+  return 'id-' + Math.random().toString(36).substr(2, 16);
+};
+
+
+const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): BuilderElement[] => {
+  const masterMap = new Map<string, any>();
+
+  // Flatten and map master elements by options.uniqueId
+  master.forEach((masterBlock) => {
+    if (masterBlock.component.options.uniqueId) {
+      masterMap.set(masterBlock.component.options.uniqueId, masterBlock);
+    }
+
+    const flattenAndMap = (obj: any) => {
+      if (Array.isArray(obj)) {
+        obj.forEach((item) => {
+          if (item.uniqueId) {
+            masterMap.set(item.uniqueId, item);
+          }
+          flattenAndMap(item);
+        });
+      } else if (typeof obj === 'object' && obj !== null) {
+        for (const key in obj) {
+          if (obj.hasOwnProperty(key) && key !== 'children') {
+            flattenAndMap(obj[key]);
+          }
+        }
+      }
+    };
+
+    flattenAndMap(masterBlock.component.options);
   });
 
-  const mergedBlocks = child.map((childBlock) => {
-    const mergedTabs = childBlock.component.options.tabs.filter((childTab: Tab) => {
-      if (!childTab.uniqueId) {
+  const mergeArrays = (masterArray: any[], childArray: any[]): any[] => {
+    const result = childArray.filter((childItem: any) => {
+      if (!childItem.uniqueId) {
         return true;
       }
-      return masterMap.has(childTab.uniqueId);
-    }).map((childTab: Tab) => {
-      if (childTab.uniqueId && masterMap.has(childTab.uniqueId)) {
+      return masterMap.has(childItem.uniqueId);
+    }).map((childItem: any) => {
+      if (childItem.uniqueId && masterMap.has(childItem.uniqueId)) {
         return {
-          ...masterMap.get(childTab.uniqueId),
-          ...childTab,
+          ...masterMap.get(childItem.uniqueId),
+          ...childItem,
         };
       }
-      return childTab;
+      return childItem;
     });
 
-    // Add tabs from master that are not in child
-    master.forEach((masterBlock) => {
-      masterBlock.component.options.tabs.forEach((masterTab: Tab) => {
-        if (masterTab.uniqueId && !mergedTabs.find((tab) => tab.uniqueId === masterTab.uniqueId)) {
-          mergedTabs.push(masterTab);
+    masterArray.forEach((masterItem: any) => {
+      if (masterItem.uniqueId && !result.find((item) => item.uniqueId === masterItem.uniqueId)) {
+        result.push(masterItem);
+      }
+    });
+
+    return result;
+  };
+
+  const mergedBlocks = child.map((childBlock) => {
+    const matchingMasterBlock = master.find((masterBlock) => masterBlock.id === childBlock.id);
+    if (matchingMasterBlock) {
+      const mergedOptions = { ...childBlock.component.options };
+
+      Object.keys(mergedOptions).forEach((key) => {
+        if (Array.isArray(mergedOptions[key])) {
+          const masterArray = matchingMasterBlock.component.options[key] || [];
+          mergedOptions[key] = mergeArrays(masterArray, mergedOptions[key]);
         }
       });
-    });
 
-    return {
-      ...childBlock,
-      component: {
-        ...childBlock.component,
-        options: {
-          ...childBlock.component.options,
-          tabs: mergedTabs,
+      return {
+        ...childBlock,
+        component: {
+          ...childBlock.component,
+          options: mergedOptions,
         },
-      },
-    };
+      };
+    }
+    return childBlock;
+  });
+
+  // Ensure all master blocks are included in the result
+  master.forEach((masterBlock) => {
+    if (!mergedBlocks.find((block) => block.id === masterBlock.id)) {
+      mergedBlocks.push(masterBlock);
+    }
   });
 
   return mergedBlocks;
 };
 
-export async function repushSingleLocale2(childId: string, privateKey: string, apiKey: string, modelName: string) {
+
+
+
+
+    export async function repushSingleLocale2(childId: string, privateKey: string, apiKey: string, modelName: string) {
 
   console.log('here2234');
 
@@ -334,35 +419,6 @@ export async function updateSelectedElements(chidrenId: string, masterClone: any
   return (await updateChildren(chidrenId, privateKey, finalBlocks, modelName, masterClone?.data))?.ok
 }
 
-const addUniqueIds = (obj: any): any => {
-  const traverse = (current: any): any => {
-    if (Array.isArray(current)) {
-      return current.map((item) => {
-        if (typeof item === 'object' && item !== null) {
-          if (!item.uniqueId) {
-            item.uniqueId = generateUniqueId();
-          }
-          return { ...item, ...traverse(item) };
-        }
-        return item;
-      });
-    } else if (typeof current === 'object' && current !== null) {
-      let newObj: any = { ...current };
-      for (const key in current) {
-        if (current.hasOwnProperty(key) && key !== 'children') {
-          newObj[key] = traverse(current[key]);
-        }
-      }
-      return newObj;
-    }
-    return current;
-  };
-  return traverse(obj);
-};
-
-const generateUniqueId = (): string => {
-  return 'id-' + Math.random().toString(36).substr(2, 16);
-};
 
 export async function pushToLocales(localesToPublish: string[], cloneContent: any, privateKey: string, modelName: string) {
   const createdEntries: any[] = []
@@ -378,6 +434,7 @@ export async function pushToLocales(localesToPublish: string[], cloneContent: an
 
   masterBlocks = addUniqueIds(masterBlocks);
   await pushBlocks(cloneContent?.id, modelName, masterBlocks, privateKey)
+  console.log('unique masterBlocks',masterBlocks);
 
 
   const results = localesToPublish.map(async (locale: string) => {

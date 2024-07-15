@@ -194,33 +194,35 @@ const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): Builder
     return result;
   };
 
-  const mergedBlocks = child.map((childBlock) => {
-    const matchingMasterBlock = master.find((masterBlock) => masterBlock.id === childBlock.id);
-    if (matchingMasterBlock) {
-      const mergedOptions = { ...childBlock.component.options };
+  const mergedBlocks = master.map((masterBlock) => {
+    const matchingChildBlock = child.find((childBlock) => childBlock.id === masterBlock.id);
+    if (matchingChildBlock) {
+      const mergedOptions = { ...matchingChildBlock.component.options };
 
       Object.keys(mergedOptions).forEach((key) => {
         if (Array.isArray(mergedOptions[key])) {
-          const masterArray = matchingMasterBlock.component.options[key] || [];
+          const masterArray = masterBlock.component.options[key] || [];
           mergedOptions[key] = mergeArrays(masterArray, mergedOptions[key]);
         }
       });
 
       return {
-        ...childBlock,
+        ...masterBlock,
         component: {
-          ...childBlock.component,
+          ...masterBlock.component,
           options: mergedOptions,
         },
       };
     }
-    return childBlock;
+    return masterBlock;
   });
 
-  // Ensure all master blocks are included in the result
-  master.forEach((masterBlock) => {
-    if (!mergedBlocks.find((block) => block.id === masterBlock.id)) {
-      mergedBlocks.push(masterBlock);
+  // Append child blocks that are not present in the master
+  child.forEach((childBlock) => {
+    if (!childBlock.component.options.uniqueId || masterMap.has(childBlock.component.options.uniqueId)) {
+      if (!mergedBlocks.find((block) => block.id === childBlock.id)) {
+        mergedBlocks.push(childBlock);
+      }
     }
   });
 
@@ -228,10 +230,7 @@ const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): Builder
 };
 
 
-
-
-
-    export async function repushSingleLocale2(childId: string, privateKey: string, apiKey: string, modelName: string) {
+  export async function repushSingleLocale2(childId: string, privateKey: string, apiKey: string, modelName: string) {
 
   console.log('here2234');
 

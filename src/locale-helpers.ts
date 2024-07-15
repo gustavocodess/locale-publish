@@ -96,10 +96,14 @@ export async function forcePushLocale(chidrenId: string, privateKey: string, api
 
 // TK --------
 
+const generateUniqueId = (): string => {
+  return 'id-' + Math.random().toString(36).substr(2, 16);
+};
+
 const addUniqueIds = (obj: any): any => {
-  const traverse = (current: any): any => {
+  const traverse = (current: any, parent: any = null, propertyName: string = ''): any => {
     if (Array.isArray(current)) {
-      return current.map((item) => {
+      const updatedArray = current.map((item) => {
         if (typeof item === 'object' && item !== null) {
           if (!item.uniqueId) {
             item.uniqueId = generateUniqueId();
@@ -108,11 +112,15 @@ const addUniqueIds = (obj: any): any => {
         }
         return item;
       });
+      if (parent && propertyName) {
+        parent[`${propertyName}_masterSnapshot`] = btoa(JSON.stringify(updatedArray));
+      }
+      return updatedArray;
     } else if (typeof current === 'object' && current !== null) {
       let newObj: any = { ...current };
       for (const key in current) {
         if (current.hasOwnProperty(key) && key !== 'children') {
-          newObj[key] = traverse(current[key]);
+          newObj[key] = traverse(current[key], newObj, key);
         }
       }
       return newObj;
@@ -134,11 +142,6 @@ const addUniqueIds = (obj: any): any => {
     return addUniqueIdToComponent(obj);
   }
 };
-
-const generateUniqueId = (): string => {
-  return 'id-' + Math.random().toString(36).substr(2, 16);
-};
-
 
 const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): BuilderElement[] => {
   const masterMap = new Map<string, any>();
@@ -169,13 +172,10 @@ const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): Builder
     flattenAndMap(masterBlock.component.options);
   });
 
-  const mergeArrays = (masterArray: any[], childArray: any[]): any[] => {
-    const result = childArray.filter((childItem: any) => {
-      if (!childItem.uniqueId) {
-        return true;
-      }
-      return masterMap.has(childItem.uniqueId);
-    }).map((childItem: any) => {
+  const mergeArrays = (masterArray: any[], childArray: any[], snapshot: any, snapshotKey: string): any[] => {
+    const childUniqueIds = new Set(childArray.map((childItem: any) => childItem.uniqueId));
+
+    const result = childArray.map((childItem: any) => {
       if (childItem.uniqueId && masterMap.has(childItem.uniqueId)) {
         return {
           ...masterMap.get(childItem.uniqueId),
@@ -186,15 +186,26 @@ const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): Builder
     });
 
     masterArray.forEach((masterItem: any) => {
-      if (masterItem.uniqueId && !result.find((item) => item.uniqueId === masterItem.uniqueId)) {
-        result.push(masterItem);
+      if (masterItem.uniqueId && !childUniqueIds.has(masterItem.uniqueId)) {
+        // That condition includes Scenario of unwanted Element which shouldn't be pushed'
+        console.log('processing',masterItem.uniqueId);
+        console.log('lastSnapshot',snapshot);
+        const lastMaster = snapshot ? JSON.parse(atob(snapshot)) : [];
+        console.log('lastMaster',lastMaster);
+        const existsInLastMaster = lastMaster.some((snapshotItem: any) => snapshotItem.uniqueId === masterItem.uniqueId);
+
+        if (!existsInLastMaster) {
+          console.log('unwanted scenario',masterItem.uniqueId);
+          result.push(masterItem);
+
+        }
       }
     });
 
     return result;
   };
 
-  const mergedBlocks = master.map((masterBlock) => {
+  let mergedBlocks = master.map((masterBlock) => {
     const matchingChildBlock = child.find((childBlock) => childBlock.id === masterBlock.id);
     if (matchingChildBlock) {
       const mergedOptions = { ...matchingChildBlock.component.options };
@@ -202,7 +213,10 @@ const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): Builder
       Object.keys(mergedOptions).forEach((key) => {
         if (Array.isArray(mergedOptions[key])) {
           const masterArray = masterBlock.component.options[key] || [];
-          mergedOptions[key] = mergeArrays(masterArray, mergedOptions[key]);
+          const snapshotKey = `${key}_masterSnapshot`;
+          const snapshot = matchingChildBlock.component.options[snapshotKey];
+
+          mergedOptions[key] = mergeArrays(masterArray, mergedOptions[key], snapshot, snapshotKey);
         }
       });
 
@@ -226,13 +240,36 @@ const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): Builder
     }
   });
 
+  mergedBlocks = mergedBlocks.map((block) => {
+    const matchingMasterBlock = master.find((masterBlock) => masterBlock.id === block.id);
+    if (matchingMasterBlock) {
+      const updatedOptions = { ...block.component.options };
+      Object.keys(updatedOptions).forEach((key) => {
+        if (Array.isArray(updatedOptions[key])) {
+          const snapshotKey = `${key}_masterSnapshot`;
+          const masterSnapshot = btoa(JSON.stringify(matchingMasterBlock.component.options[key]));
+          updatedOptions[snapshotKey] = masterSnapshot;
+          console.log('new snapshot',masterSnapshot);
+          console.log('new snapshot json',matchingMasterBlock.component.options[key]);
+        }
+      });
+
+      return {
+        ...block,
+        component: {
+          ...block.component,
+          options: updatedOptions,
+        },
+      };
+    }
+    return block;
+  });
+
   return mergedBlocks;
 };
 
 
   export async function repushSingleLocale2(childId: string, privateKey: string, apiKey: string, modelName: string) {
-
-  console.log('here2234');
 
   const master = fastClone(appState?.designerState?.editingContentModel);
   const child = await (await fetch(`https://cdn.builder.io/api/v3/content/${modelName}/${childId}?apiKey=${apiKey}&cachebust=true&includeUnpublished=true&cacheSeconds=1`)).json();

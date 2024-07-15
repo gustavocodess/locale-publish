@@ -268,9 +268,46 @@ const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): Builder
   return mergedBlocks;
 };
 
+const duplicateDefaultValuesToLocaleValues = (blocks: any[], locale: string): any[] => {
+  const defaultLocale = 'Default';
+  const traverseOptions = (options: any) => {
+    for (const key in options) {
+      if (options.hasOwnProperty(key)) {
+        const value = options[key];
+        if (value && typeof value === 'object' && value["@type"] === "@builder.io/core:LocalizedValue") {
+          if (!value[locale] && value[defaultLocale]) {
+            value[locale] = value[defaultLocale];
+          }
+        } else if (value && typeof value === 'object') {
+          traverseOptions(value);
+        } else if (Array.isArray(value)) {
+          value.forEach(item => {
+            if (typeof item === 'object') {
+              traverseOptions(item);
+            }
+          });
+        }
+      }
+    }
+  };
+
+  return blocks.map(block => {
+    if (block.component && block.component.options) {
+      traverseOptions(block.component.options);
+    }
+    return block;
+  });
+};
+
+const getLocaleFromChild = (child: any): string => {
+  const localeQuery = child.query.find((q: any) => q.property === "locale");
+  return localeQuery ? localeQuery.value[0] : null;
+};
+
 
   export async function repushSingleLocale2(childId: string, privateKey: string, apiKey: string, modelName: string) {
 
+    console.log('here 34');
   const master = fastClone(appState?.designerState?.editingContentModel);
   const child = await (await fetch(`https://cdn.builder.io/api/v3/content/${modelName}/${childId}?apiKey=${apiKey}&cachebust=true&includeUnpublished=true&cacheSeconds=1`)).json();
 
@@ -279,7 +316,12 @@ const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): Builder
   await pushBlocks(master?.id, modelName, masterBlocks, privateKey)
 
   const childBlocks = child?.data?.blocks?.filter((block: any) => !block?.id.includes('pixel'));
-  const resultBlocks: any = mergeBlocks(masterBlocks, childBlocks);
+  let resultBlocks: any = mergeBlocks(masterBlocks, childBlocks);
+
+  console.log('get locales',child);
+  const childLocale = getLocaleFromChild(child);
+  console.log('childLocale',childLocale);
+  resultBlocks = duplicateDefaultValuesToLocaleValues(resultBlocks, childLocale);
 
   console.log('child blocks', childBlocks);
   console.log('master blocks',masterBlocks);

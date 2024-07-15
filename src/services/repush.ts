@@ -10,18 +10,20 @@ const fastClone = (obj: any) =>
   obj === undefined ? undefined : JSON.parse(JSON.stringify(obj));
 
 export async function repush(childId: string, privateKey: string, apiKey: string, modelName: string) {
-  console.log('Debug: Re-Push Scenario (Approach II), v40');
+
+  console.log('Debug: Re-Push Scenario (Approach II), v46');
 
   try {
+
     const master = fastClone(appState?.designerState?.editingContentModel);
+    let masterBlocks = JSON.parse(master?.data?.blocksString).filter((block: any) => !block?.id.includes('pixel'));
+
     const childResponse = await fetch(`https://cdn.builder.io/api/v3/content/${modelName}/${childId}?apiKey=${apiKey}&cachebust=true&includeUnpublished=true&cacheSeconds=1`);
     const child = await childResponse.json();
+    const childBlocks = child?.data?.blocks?.filter((block: any) => !block?.id.includes('pixel'));
 
-    let masterBlocks = JSON.parse(master?.data?.blocksString).filter((block: any) => !block?.id.includes('pixel'));
     masterBlocks = addUniqueIdsInBlocks(masterBlocks);
     await pushBlocks(master?.id, modelName, masterBlocks, privateKey);
-
-    const childBlocks = child?.data?.blocks?.filter((block: any) => !block?.id.includes('pixel'));
     let resultBlocks: any = mergeBlocks(masterBlocks, childBlocks);
 
     const childLocale = getLocaleFromPage(child);
@@ -35,6 +37,7 @@ export async function repush(childId: string, privateKey: string, apiKey: string
 
     const childData: any = { ...child?.data };
     const result = await updateChildren(childId, privateKey, resultBlocks, modelName, childData);
+
     return result;
 
   } catch (error) {

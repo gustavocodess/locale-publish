@@ -17,18 +17,23 @@ export const addUniqueIdsInBlocks = (obj: any): any => {
           }
           return item;
         });
-        if (parent && propertyName) {
+        if (parent && propertyName && !propertyName.endsWith('_masterSnapshot') && propertyName !== 'uniqueId') {
           parent[`${propertyName}_masterSnapshot`] = btoa(JSON.stringify(updatedArray));
         }
         return updatedArray;
       } else if (typeof current === 'object' && current !== null) {
         let newObj: any = { ...current };
         for (const key in current) {
-          if (current.hasOwnProperty(key) && key !== 'children') {
+          if (current.hasOwnProperty(key) && key !== 'children' && !key.endsWith('_masterSnapshot') && key !== 'uniqueId') {
             newObj[key] = traverse(current[key], newObj, key);
           }
         }
+        if (parent && propertyName && !propertyName.endsWith('_masterSnapshot') && propertyName !== 'uniqueId') {
+          parent[`${propertyName}_masterSnapshot`] = btoa(JSON.stringify(newObj));
+        }
         return newObj;
+      } else if (parent && propertyName && !propertyName.endsWith('_masterSnapshot') && propertyName !== 'uniqueId') {
+        parent[`${propertyName}_masterSnapshot`] = btoa(JSON.stringify(current));
       }
       return current;
     } catch (error) {
@@ -143,6 +148,16 @@ export const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): 
             if (!matchingChildBlock?.component) return;
             const snapshot = matchingChildBlock.component.options[snapshotKey];
             mergedOptions[key] = mergeArrays(masterArray, mergedOptions[key], snapshot, snapshotKey);
+          } else if (typeof mergedOptions[key] !== 'object' && typeof mergedOptions[key] !== 'undefined' && !Array.isArray(mergedOptions[key])) {
+            const snapshotKey = `${key}_masterSnapshot`;
+            const snapshot = matchingChildBlock?.component?.options[snapshotKey];
+
+            if (snapshot) {
+              const decodedSnapshot = JSON.parse(atob(snapshot));
+              if (mergedOptions[key] === decodedSnapshot) {
+                mergedOptions[key] = masterBlock?.component?.options[key];
+              }
+            }
           }
         });
 
@@ -181,6 +196,16 @@ export const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): 
 
                 console.log(`Debug: new snapshot for ${key}`, masterSnapshot);
                 console.log(`Debug: new snapshot json for ${key}`, matchingMasterBlock.component.options[key]);
+              }
+            } else if (typeof updatedOptions[key] !== 'object' && typeof updatedOptions[key] !== 'undefined' && !Array.isArray(updatedOptions[key])) {
+              const snapshotKey = `${key}_masterSnapshot`;
+              const snapshot = block?.component?.options[snapshotKey];
+
+              if (snapshot) {
+                const decodedSnapshot = JSON.parse(atob(snapshot));
+                if (updatedOptions[key] === decodedSnapshot) {
+                  updatedOptions[key] = matchingMasterBlock?.component?.options[key];
+                }
               }
             }
           });

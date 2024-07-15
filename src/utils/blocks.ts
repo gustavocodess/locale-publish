@@ -133,7 +133,7 @@ export const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): 
     let mergedBlocks = child.map((childBlock) => {
       const matchingMasterBlock = master.find((masterBlock) => masterBlock.id === childBlock.id);
       if (matchingMasterBlock && matchingMasterBlock.component && matchingMasterBlock.component.options) {
-        const mergedOptions = { ...childBlock.component.options };
+        const mergedOptions = { ...childBlock?.component?.options };
 
         Object.keys(mergedOptions).forEach((key) => {
           if (Array.isArray(mergedOptions[key])) {

@@ -3,6 +3,7 @@ import appState from '@builder.io/app-context';
 import { pushBlocks, pushLocale, updateChildren } from "./locale-service";
 import { clearBlock, deepGet, deepSet, fastClone, getQueryLocales, localizeBlocks, localizeDataFromMaster, replaceAll, tagMasterBlockOptions } from "./plugin-helpers";
 import { findIndex } from "lodash";
+import { get } from "https";
 // @ts-
 interface BuilderBlock {
   responsiveStyles: any;
@@ -102,7 +103,6 @@ export async function forcePushLocale(chidrenId: string, privateKey: string, api
 export async function repushSingleLocale(chidrenId: string, privateKey: string, apiKey: string, modelName: string) {
   const masterContent = fastClone(appState?.designerState?.editingContentModel)
   const childrenContent = await (await fetch(`https://cdn.builder.io/api/v3/content/${modelName}/${chidrenId}?apiKey=${apiKey}&cachebust=true&includeUnpublished=true&cacheSeconds=1`)).json();
-  // ?cachebust=true&includeUnpublished=true&cacheSeconds=1
   const masterBlocks = (JSON.parse(masterContent?.data?.blocksString)).filter((block: any) => !block?.id.includes('pixel'))
   let childrenContentBlocks = childrenContent?.data?.blocks?.filter((block: any) => !block?.id.includes('pixel'))
   const localeToPush = childrenContent?.query?.find((query: any) => query?.property === 'locale')?.value[0]
@@ -114,9 +114,15 @@ export async function repushSingleLocale(chidrenId: string, privateKey: string, 
       if (path.endsWith(localeToPush)) {
         const localizedPath = replaceAll(path, '.Default', `.${localeToPush}`)
         const getTranslation = deepGet(block, localizedPath)
+        // avoid pushing translations that are not on the master (local cards only example)
+        if (typeof getTranslation === 'object' && !getTranslation?.gm_tag) {
+          return
+        }
+        const mapPath = block.id + '.' + localizedPath
         if (getTranslation !== undefined) {
-          const mapPath = block.id + '.' + localizedPath
           childrenTranslationsMap[mapPath] = getTranslation
+        } else {
+          childrenTranslationsMap[mapPath] = deepGet(block, path)
         }
         // childrenTranlationsMap[mapPath] = getTranslation ? getTranslation : deepGet(block, replaceAll(path, `.${localeToPush}`, '.Default'))
       }
@@ -163,7 +169,6 @@ export async function repushSingleLocale(chidrenId: string, privateKey: string, 
         if (
           !currentPath.includes('ComponentStyles')
           && pathAbove.endsWith(localeToPush)
-          // bg-BG.2
           && elem !== undefined && !elem.gm_tag
           && typeof elem === 'object'
           && !currentPath.includes(addedPaths)
@@ -176,12 +181,12 @@ export async function repushSingleLocale(chidrenId: string, privateKey: string, 
       // apply translation if exists and if default value on master is the same
       traverse(newBlock).map(function () {
         const path = this.path.join('.')
-        const mapPath = childrenBlock.id + '.' + replaceAll(path, '.Default', `.${localeToPush}`)
+        const localizedPath = childrenBlock.id + '.' + replaceAll(path, '.Default', `.${localeToPush}`)
 
-        if (path.endsWith('Default') && childrenTranslationsMap[mapPath]) {
+        if (path.endsWith('Default') && childrenTranslationsMap[localizedPath]) {
           const defaultOnMaster = deepGet(masterBlocksMap[childrenBlock.id], path)
           const defaultOnChildren = deepGet(childrenBlock, path)
-          let translatedValue = childrenTranslationsMap[mapPath]
+          let translatedValue = childrenTranslationsMap[localizedPath]
           // logic added because for nested columsn the final value is not a string
           if (typeof defaultOnMaster === 'string' && defaultOnMaster !== defaultOnChildren) {
             translatedValue = defaultOnMaster
@@ -192,12 +197,12 @@ export async function repushSingleLocale(chidrenId: string, privateKey: string, 
               translatedValue = defaultOnMaster
             }
           }
-          deepSet(newBlock, mapPath.split('.').slice(1).join('.'), translatedValue, true)
+          deepSet(newBlock, localizedPath.split('.').slice(1).join('.'), translatedValue, true)
         }
       })
 
-      // clear block from null content or content not on local
-      newBlock = clearBlock(newBlock, childrenContentBlocks, localeToPush)
+      // // clear block from null content or content not on local
+      // newBlock = clearBlock(newBlock, childrenContentBlocks, localeToPush)
 
       // restore existing content in childrenOnly
       Object.keys(localValuesOnly).map((keyPath: string) => {
@@ -218,7 +223,6 @@ export async function repushSingleLocale(chidrenId: string, privateKey: string, 
       })
       
       finalBlocks[indexToReplace] = newBlock
-      // finalBlocks[indexToReplace] = newBlock
     } else {
       // block doesnt exist on master, so
       if (!childrenBlock?.meta?.masterId) {

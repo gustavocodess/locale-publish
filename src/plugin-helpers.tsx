@@ -99,15 +99,7 @@ export const fastClone = (obj: any) =>
 
 
 export const deepGet = (obj: any, newPath: string) => {
-  for (let i = 0, path = newPath.split('.'), len=path.length; i<len; i++){
-    if (path[i] && obj[path[i]] !== undefined) {
-      obj = obj[path[i]];
-    } else {
-      // console.log('deepGet error: ', obj, newPath);
-      return undefined;
-    }
-  };
-  return obj;
+  return traverse(obj).get(newPath.split('.')) || undefined
 };
 
 function isObject(obj: any) {
@@ -143,29 +135,39 @@ export const deepSet = (obj: any, path: string, value: any, create: boolean) => 
 export function localizeBlocks(masterBlocks: any[], locale: string, isRepush: boolean, childrenTranlationsMap?: any) {
   const newBlocks:any[] =  []
   masterBlocks.forEach((block: BuilderBlock) => {
-    // @ts-ignore next-line
-    delete block.responsiveStyles
-    // @ts-ignore next-line
-    delete block.meta
-
   traverse(block).map(function () {
     const path = this.path.join('.')
+    if (path.includes('meta') || path.includes('responsiveStyles')) {
+      return
+    }
+
+    const localizedPath = replaceAll(path, '.Default', `.${locale}`)
+      const localizedPathId = block?.id +'.' + localizedPath
     if (isRepush) {
-      if (path.endsWith('Default') && Boolean(childrenTranlationsMap[replaceAll(path, '.Default', `.${locale}`)])) {
-        const valueToTranslate = deepGet(block, path)
+      if (path.endsWith('Default') && Boolean(childrenTranlationsMap[localizedPathId])) {
+        // const valueToTranslate = deepGet(block, path)
+        const valueToTranslate = childrenTranlationsMap[localizedPathId]
         // deepSet(block, path.replace('Default', locale), valueToTranslate, true)
         deepSet(block, this.path.slice(0, -1).join('.') + `.${locale}`,valueToTranslate, true)
-      } else if (
-        path.endsWith('Default')
-        && childrenTranlationsMap[block?.id +'.' + replaceAll(path, '.Default', `.${locale}`)] === undefined) {
-        // deepSet(block, path, null, true)
-        unset(block, path)
-      } 
+      }
+      // else if (
+      //   path.endsWith('Default')
+      //   && childrenTranlationsMap[block?.id +'.' + replaceAll(path, '.Default', `.${locale}`)] === undefined) {
+      //   // deepSet(block, path, null, true)
+      //   unset(block, path)
+      // }
+      else if (path.endsWith('Default') && !childrenTranlationsMap[localizedPathId]) {
+        // means there is no translation on local block
+        // so we can just push the default value
+        const valueToTranslate = deepGet(block, path)
+        deepSet(block, localizedPath ,valueToTranslate, true)
+      }
     } else {
       // works for first push and force push
       if (path.endsWith('Default')) {
         const valueToTranslate = deepGet(block, path)
-        deepSet(block, this.path.slice(0, -1).join('.') + `.${locale}`,valueToTranslate, true)
+        // deepSet(block, this.path.slice(0, -1).join('.') + `.${locale}`,valueToTranslate, true)
+        deepSet(block, localizedPath, valueToTranslate, true)
       }
     }
   })
@@ -250,6 +252,7 @@ export const clearBlock = (block: any, childrenBlocks: any, locale: string) => {
           deepSet(newBlock, arrayPath, newArray, true)
         }
       } else {
+        // unset object
         unset(newBlock, replaceAll(path, '.Default', `.${locale}`))
       }
     }

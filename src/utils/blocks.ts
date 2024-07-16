@@ -1,8 +1,11 @@
 import { BuilderElement } from "@builder.io/react";
 
+const excludedProperties = ['children', 'uniqueId', '@type', 'Default', 'shouldTranslate'];
+
 const generateUniqueId = (): string => {
   return 'id-' + Math.random().toString(36).substr(2, 16);
 };
+
 
 export const addUniqueIdsInBlocks = (obj: any): any => {
   const traverse = (current: any, parent: any = null, propertyName: string = ''): any => {
@@ -17,22 +20,22 @@ export const addUniqueIdsInBlocks = (obj: any): any => {
           }
           return item;
         });
-        if (parent && propertyName && !propertyName.endsWith('_masterSnapshot') && propertyName !== 'uniqueId') {
+        if (parent && propertyName && !propertyName.endsWith('_masterSnapshot') && !excludedProperties.includes(propertyName)) {
           parent[`${propertyName}_masterSnapshot`] = btoa(JSON.stringify(updatedArray));
         }
         return updatedArray;
       } else if (typeof current === 'object' && current !== null) {
         let newObj: any = { ...current };
         for (const key in current) {
-          if (current.hasOwnProperty(key) && key !== 'children' && !key.endsWith('_masterSnapshot') && key !== 'uniqueId') {
+          if (current.hasOwnProperty(key) && !key.endsWith('_masterSnapshot') && !excludedProperties.includes(key)) {
             newObj[key] = traverse(current[key], newObj, key);
           }
         }
-        if (parent && propertyName && !propertyName.endsWith('_masterSnapshot') && propertyName !== 'uniqueId') {
+        if (parent && propertyName && !propertyName.endsWith('_masterSnapshot') && !excludedProperties.includes(propertyName)) {
           parent[`${propertyName}_masterSnapshot`] = btoa(JSON.stringify(newObj));
         }
         return newObj;
-      } else if (parent && propertyName && !propertyName.endsWith('_masterSnapshot') && propertyName !== 'uniqueId') {
+      } else if (parent && propertyName && !propertyName.endsWith('_masterSnapshot') && !excludedProperties.includes(propertyName)) {
         parent[`${propertyName}_masterSnapshot`] = btoa(JSON.stringify(current));
       }
       return current;
@@ -93,7 +96,7 @@ export const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): 
           });
         } else if (typeof obj === 'object' && obj !== null) {
           for (const key in obj) {
-            if (obj.hasOwnProperty(key) && key !== 'children') {
+            if (obj.hasOwnProperty(key) && !key.endsWith('_masterSnapshot') && !excludedProperties.includes(key)) {
               flattenAndMap(obj[key]);
             }
           }
@@ -152,7 +155,7 @@ export const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): 
           } else {
             mergedObject[key] = mergeObjects(masterObject?.[key] || {}, childObject[key]);
           }
-        } else if (typeof childObject[key] !== 'undefined' && !Array.isArray(childObject[key])) {
+        } else if (typeof childObject[key] !== 'undefined' && !Array.isArray(childObject[key]) && !key.endsWith('_masterSnapshot') && !excludedProperties.includes(key)) {
           const snapshotKey = `${key}_masterSnapshot`;
           const snapshot = childObject[snapshotKey];
 
@@ -198,7 +201,6 @@ export const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): 
         const snapshot = newOptions[snapshotKey];
 
         if (Array.isArray(newOptions[key])) {
-          // Handle array elements recursively
           newOptions[key] = newOptions[key].map((item: any, index: number) => {
             if (typeof item === 'object' && item !== null) {
               return updateOptionsWithSnapshots(item, masterOptions?.[key]?.[index]);
@@ -206,12 +208,10 @@ export const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): 
             return item;
           });
 
-          // Update the snapshot for the array
           const masterSnapshot = btoa(JSON.stringify(masterOptions?.[key]));
           newOptions[snapshotKey] = masterSnapshot;
 
         } else if (typeof newOptions[key] === 'object' && newOptions[key] !== null) {
-          // Handle nested objects recursively
           if (snapshot) {
             const decodedSnapshot = JSON.parse(atob(snapshot));
             if (JSON.stringify(newOptions[key]) === JSON.stringify(decodedSnapshot)) {
@@ -223,8 +223,7 @@ export const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): 
             newOptions[key] = updateOptionsWithSnapshots(newOptions[key], masterOptions?.[key]);
           }
 
-        } else {
-          // Handle primitive values
+        } else if (!key.endsWith('_masterSnapshot') && !excludedProperties.includes(key)) {
           if (snapshot) {
             const decodedSnapshot = JSON.parse(atob(snapshot));
             if (newOptions[key] === decodedSnapshot) {
@@ -232,7 +231,6 @@ export const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): 
             }
           }
 
-          // Update the snapshot for primitive values
           if (masterOptions && masterOptions.hasOwnProperty(key)) {
             newOptions[snapshotKey] = btoa(JSON.stringify(masterOptions[key]));
           }

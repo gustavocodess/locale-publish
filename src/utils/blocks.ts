@@ -222,8 +222,9 @@ export const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): 
 
           if (snapshot) {
             const decodedSnapshot = JSON.parse(atob(snapshot));
-            if (childObject[key] === decodedSnapshot) {
+            if (masterObject[key] !== decodedSnapshot) {
               mergedObject[key] = masterObject?.[key];
+              mergedObject[snapshotKey] = btoa(JSON.stringify(masterObject[key]));
             }
           }
         }

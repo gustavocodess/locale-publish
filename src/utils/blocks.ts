@@ -1,21 +1,22 @@
 import { BuilderElement } from "@builder.io/react";
 
-const excludedProperties = ['children', 'uniqueId', '@type', 'Default', 'shouldTranslate'];
+const excludedProperties = ['children', 'uniqueId', '@type', 'shouldTranslate'];
 
 const mergeLocalizedValues = (masterValue: any, childValue: any): any => {
   if (typeof masterValue === 'object' && masterValue["@type"] === "@builder.io/core:LocalizedValue") {
     const updatedValue = { ...childValue };
 
-    if (childValue?.Default !== masterValue.Default) {
+    const decodedChildSnapshot = childValue.Default_masterSnapshot ? JSON.parse(atob(childValue.Default_masterSnapshot)) : null;
+
+    if (masterValue.Default !== decodedChildSnapshot) {
       updatedValue.Default = masterValue.Default;
       Object.keys(childValue).forEach((key) => {
         if (key !== 'Default' && key !== 'Default_masterSnapshot' && key !== '@type') {
-          if (childValue[key] === childValue.Default) {
-            updatedValue[key] = masterValue.Default;
-          }
+          updatedValue[key] = masterValue.Default;
         }
       });
     }
+
     return updatedValue;
   }
   return childValue;

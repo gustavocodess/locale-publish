@@ -112,6 +112,53 @@ export const addUniqueIdsInBlocks = (obj: any): any => {
   }
 };
 
+
+
+const correctComponentPositions = (masterBlocks: BuilderElement[], childBlocks: BuilderElement[], mergedBlocks: BuilderElement[]): BuilderElement[] => {
+
+  const baseComponents: BuilderElement[] = [];
+
+  mergedBlocks.forEach(block => {
+    if (block.id && masterBlocks.some(mBlock => mBlock.id === block.id) && childBlocks.some(cBlock => cBlock.id === block.id)) {
+      baseComponents.push(block);
+    }
+  });
+
+  masterBlocks.forEach(block => {
+    if (!baseComponents.some(baseBlock => baseBlock.id === block.id)) {
+      const index = masterBlocks.findIndex(mBlock => mBlock.id === block.id);
+      baseComponents.splice(index, 0, block);
+    }
+  });
+
+  childBlocks.forEach(block => {
+    if (!baseComponents.some(baseBlock => baseBlock.id === block.id)) {
+      const index = childBlocks.findIndex(cBlock => cBlock.id === block.id);
+      const nextChildBlock = childBlocks[index + 1];
+      const prevChildBlock = childBlocks[index - 1];
+
+      let insertIndex = baseComponents.length; // Default to end
+
+      if (nextChildBlock) {
+        const nextIndex = baseComponents.findIndex(baseBlock => baseBlock.id === nextChildBlock.id);
+        if (nextIndex !== -1) {
+          insertIndex = nextIndex;
+        }
+      } else if (prevChildBlock) {
+        const prevIndex = baseComponents.findIndex(baseBlock => baseBlock.id === prevChildBlock.id);
+        if (prevIndex !== -1) {
+          insertIndex = prevIndex + 1;
+        }
+      }
+
+      baseComponents.splice(insertIndex, 0, block);
+    }
+  });
+
+  return baseComponents;
+};
+
+
 export const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): BuilderElement[] => {
   const masterMap = new Map<string, any>();
 
@@ -319,6 +366,8 @@ export const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): 
       }
       return block;
     });
+
+    mergedBlocks = correctComponentPositions(master, child, mergedBlocks);
 
     return mergedBlocks;
   } catch (error) {

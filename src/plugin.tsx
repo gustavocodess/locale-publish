@@ -82,8 +82,8 @@ registerPlugin(
           if (isGlobalField && isGlobalField.length) {
             isGlobalField[0].hidden = true;
           }
-          const newFields = editingContentModel?.useFields?.filter((field: any) => field.name !== 'isGlobal') || [];  
-          appState.designerState.editingContentModel.useFields = [...newFields, ...isGlobalField];
+          // const newFields = editingContentModel?.useFields?.filter((field: any) => field.name !== 'isGlobal') || [];  
+          // appState.designerState.editingContentModel.useFields = [...newFields, ...isGlobalField];
           // end Hidding isGlobal manually
 
           return draftClone;

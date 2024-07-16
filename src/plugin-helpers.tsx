@@ -200,23 +200,35 @@ export function tagMasterBlockOptions(block: BuilderBlock) {
   const newBlock = {...block}
   traverse(newBlock).map(function () {
     const currentPath = this.path.join('.')
-    const pathAbove = this.path.slice(0, -1)
+    const value = this.node
+    const hasTag = value?.gm_tag
     if (
-      pathAbove.join('.').endsWith('Default')
-      && !deepGet(newBlock, currentPath + '.gm_tag')
-      && typeof this.node === 'object'
-      // ! why does not work?
-      //  && !this.node?.gm_tag
-      ) {
-        // && typeof this.node === 'object'
-      // && !deepGet(newBlock, currentPath + '.gm_tag') 
-      deepSet(newBlock, currentPath + '.gm_tag', `_GL-${crypto.randomUUID()}`, true)
-      // ! why does not work?
-      // this.node = {
-      //   ...this.node,
-      //   gm_tag: `_GL-${crypto.randomUUID()}`
-      // }
+      currentPath.startsWith('component.options')
+      // mark only default?
+      && currentPath.includes('Default')
+      && !hasTag
+      && typeof value === 'object'
+      && !Array.isArray(value)
+    ) {
+      // deepSet(newBlock, currentPath + '.gm_tag', `_GL-${crypto.randomUUID()}`, true)
+      deepSet(newBlock, currentPath , {...value, gm_tag: true}, true)
     }
+    // if (
+    //   pathAbove.join('.').endsWith('Default')
+    //   && !deepGet(newBlock, currentPath + '.gm_tag')
+    //   && typeof this.node === 'object'
+    //   // ! why does not work?
+    //   //  && !this.node?.gm_tag
+    //   ) {
+    //     // && typeof this.node === 'object'
+    //   // && !deepGet(newBlock, currentPath + '.gm_tag') 
+    //   deepSet(newBlock, currentPath + '.gm_tag', `_GL-${crypto.randomUUID()}`, true)
+    //   // ! why does not work?
+    //   // this.node = {
+    //   //   ...this.node,
+    //   //   gm_tag: `_GL-${crypto.randomUUID()}`
+    //   // }
+    // }
   })
   // console.log('tagged block ', newBlock)
   return newBlock;

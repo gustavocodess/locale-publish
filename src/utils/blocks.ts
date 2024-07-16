@@ -6,7 +6,6 @@ const generateUniqueId = (): string => {
   return 'id-' + Math.random().toString(36).substr(2, 16);
 };
 
-
 export const addUniqueIdsInBlocks = (obj: any): any => {
   const traverse = (current: any, parent: any = null, propertyName: string = ''): any => {
     try {

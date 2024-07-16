@@ -2,6 +2,45 @@ import { BuilderElement } from "@builder.io/react";
 
 const excludedProperties = ['children', 'uniqueId', '@type', 'Default', 'shouldTranslate'];
 
+const mergeLocalizedValues = (masterValue: any, childValue: any): any => {
+  if (typeof masterValue === 'object' && masterValue["@type"] === "@builder.io/core:LocalizedValue") {
+    const updatedValue = { ...childValue };
+
+    if (childValue?.Default !== masterValue.Default) {
+      updatedValue.Default = masterValue.Default;
+      Object.keys(childValue).forEach((key) => {
+        if (key !== 'Default' && key !== 'Default_masterSnapshot' && key !== '@type') {
+          if (childValue[key] === childValue.Default) {
+            updatedValue[key] = masterValue.Default;
+          }
+        }
+      });
+    }
+    return updatedValue;
+  }
+  return childValue;
+};
+
+const mergeLocalizedValuesInBlocks = (master: any, child: any): any => {
+  const mergedObject = { ...child };
+
+  Object.keys(child).forEach((key) => {
+    if (typeof child[key] === 'object' && !Array.isArray(child[key]) && child[key] !== null) {
+      if (master[key] && master[key]["@type"] === "@builder.io/core:LocalizedValue") {
+        mergedObject[key] = mergeLocalizedValues(master[key], child[key]);
+      } else {
+        mergedObject[key] = mergeLocalizedValuesInBlocks(master[key] || {}, child[key]);
+      }
+    } else if (Array.isArray(child[key])) {
+      mergedObject[key] = child[key].map((item: any, index: number) => {
+        return mergeLocalizedValuesInBlocks(master[key]?.[index] || {}, item);
+      });
+    }
+  });
+
+  return mergedObject;
+};
+
 const generateUniqueId = (): string => {
   return 'id-' + Math.random().toString(36).substr(2, 16);
 };
@@ -105,6 +144,28 @@ export const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): 
       flattenAndMap(masterBlock.component.options);
     });
 
+    let localizedMergedBlocks = child.map((childBlock) => {
+      const matchingMasterBlock = master.find((masterBlock) => masterBlock.id === childBlock.id);
+      if (matchingMasterBlock && matchingMasterBlock.component && matchingMasterBlock.component.options) {
+        const mergedOptions = mergeLocalizedValuesInBlocks(matchingMasterBlock.component.options, childBlock?.component?.options);
+
+        return {
+          ...childBlock,
+          component: {
+            ...childBlock.component,
+            options: mergedOptions,
+          },
+        } as BuilderElement;
+      }
+      return childBlock;
+    });
+
+    master.forEach((masterBlock) => {
+      if (!localizedMergedBlocks.find((block) => block.id === masterBlock.id)) {
+        localizedMergedBlocks.push(masterBlock as BuilderElement);
+      }
+    });
+
     const mergeArrays = (masterArray: any[], childArray: any[], snapshot: any, snapshotKey: string): any[] => {
       const childUniqueIds = new Set(childArray.map((childItem: any) => childItem.uniqueId));
 
@@ -170,20 +231,20 @@ export const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): 
       return mergedObject;
     };
 
-    let mergedBlocks = child.map((childBlock) => {
-      const matchingMasterBlock = master.find((masterBlock) => masterBlock.id === childBlock.id);
+    let mergedBlocks = localizedMergedBlocks.map((block) => {
+      const matchingMasterBlock = master.find((masterBlock) => masterBlock.id === block.id);
       if (matchingMasterBlock && matchingMasterBlock.component && matchingMasterBlock.component.options) {
-        const mergedOptions = mergeObjects(matchingMasterBlock.component.options, childBlock?.component?.options);
+        const mergedOptions = mergeObjects(matchingMasterBlock.component.options, block?.component?.options);
 
         return {
-          ...childBlock,
+          ...block,
           component: {
-            ...childBlock.component,
+            ...block.component,
             options: mergedOptions,
           },
         } as BuilderElement;
       }
-      return childBlock;
+      return block;
     });
 
     master.forEach((masterBlock) => {

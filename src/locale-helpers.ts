@@ -77,7 +77,7 @@ export async function forcePushLocale(chidrenId: string, privateKey: string, api
   // call write API to update the children with new blocks
   const result = await updateChildren(chidrenId, privateKey, finalBlocks, modelName,
     finalDataFields, newQuery,
-    childrenContent.published, childrenContent.modelId, name
+    childrenContent.published, childrenContent.modelId, name, true
   )
 
   const localeChildrenIndex = masterContent?.data?.localeChildren.findIndex((item: any) => item?.referenceId === chidrenId)
@@ -115,19 +115,27 @@ export async function repushSingleLocale(chidrenId: string, privateKey: string, 
   childrenContentBlocks?.forEach((block: any) => {
     traverse(block).map(function () {
       const path = this.path.join('.')
+      // builder-2dd272b16b024dcbb87dee05d448858f.component.options.cards.bg-BG.2.heading.bg-BG :"local card onlyyy"
       if (path.endsWith(localeToPush)) {
         const localizedPath = replaceAll(path, '.Default', `.${localeToPush}`)
-        const getTranslation = deepGet(block, localizedPath)
+        // component.options.cards.bg-BG.2.heading.bg-BG
+        const getTranslation = deepGet(block, localizedPath) // "local card onlyyy"
         const getDefaultTag = deepGet(block, replaceAll(path, `.${localeToPush}`, '.Default',))
         // avoid pushing translations that are not on the master (local cards only example)
         // apparetnly the local block once edited loses the gm_tag
         // see ctaLink on local cards
-        if (typeof getTranslation === 'object' && !getDefaultTag?.gm_tag) {
-          console.log('ignorei esse ', getTranslation,  localizedPath)
+        // if (typeof getTranslation === 'object' && !getDefaultTag?.gm_tag) {
+        if (
+          // (typeof getTranslation === 'object' && !getDefaultTag?.gm_tag)
+          // || 
+         (getTranslation !== undefined
+          &&  getDefaultTag === undefined)
+          || (typeof getTranslation === 'object' && !getDefaultTag?.gm_tag)
+          // /\ means value is local only
+        ) {
+          // !TODO: add to local values to restore
+          // console.log('ignorei esse ', getTranslation,  localizedPath)
           return
-        }
-        if (path.includes('ctaLink')) {
-          console.log('ctaLink', getTranslation, getDefaultTag, path, localizedPath)
         }
         const mapPath = block.id + '.' + localizedPath
         if (getTranslation !== undefined) {
@@ -140,71 +148,27 @@ export async function repushSingleLocale(chidrenId: string, privateKey: string, 
     })
   })
 
-  console.log('childrenTranslations Map ', childrenTranslationsMap)
-
   // creating final blocks first based on master content only
   let finalBlocks = [
     ...masterBlocks.map((block: any) => ({...block, meta: {...block.meta, masterId: block.id}}))
   ]
-
   // localizing master blocks
   finalBlocks = localizeBlocks([...finalBlocks], localeToPush, true, childrenTranslationsMap)
-
   // tagging master blocks options
-  finalBlocks = finalBlocks.map((block: any) => tagMasterBlockOptions(block))
+  finalBlocks = [...finalBlocks].map((block: any) => tagMasterBlockOptions(block))
+
+
 
   const masterBlocksMap = <any>{}
   finalBlocks.forEach((block: any) => {
     masterBlocksMap[block.id] = block
   })
 
-  const entireMasterPaths = <any>{}
-  masterBlocks.forEach((block: any) => {
-    traverse(block).map(function () {
-      const path = this.path.join('.').replace(/\.Default/g, '').replace(new RegExp(`\\.${localeToPush}`, 'g'), '')
-      entireMasterPaths[block.id + '.' + path] = true
-    })
-  })
-
-  
-
-  const childMap = <any>{}
-  childrenContentBlocks.forEach((block: any) => {
-    childMap[block?.id] = {...block}
-  })
-
-  // apply translation if exists and if default value on master is the same
-  Object.keys(childrenTranslationsMap).map((keyPath: string) => {
-    const path = keyPath.split('.').slice(1).join('.') // removing block id
-    const blockId = keyPath.split('.')[0]
-    if (!masterBlocksMap[blockId]) {
-      return
-    }
-    const defaultPath = replaceAll(path, `.${localeToPush}`, '.Default')
-    const defaultOnMaster = deepGet(masterBlocksMap[blockId], defaultPath)
-    const defaultOnChildren = deepGet(childMap[blockId], defaultPath)
-    let translatedValue = childrenTranslationsMap[keyPath]
-
-    console.log('defaults comparison ', defaultOnMaster, defaultOnChildren, keyPath)
-    if (typeof defaultOnMaster === 'string' && defaultOnMaster !== defaultOnChildren) {
-      translatedValue = defaultOnMaster
-    } else if (typeof defaultOnMaster === 'object') {
-      const masterValue = JSON.stringify(defaultOnMaster)
-      const childrenValue = JSON.stringify(defaultOnChildren)
-      if (masterValue !== childrenValue) {
-        translatedValue = defaultOnMaster
-      }
-    }
-    deepSet(childMap[blockId], path, translatedValue, true)
-  })
-
-  // apply new child blocks 
-  childrenContentBlocks = Object.values(childMap)
+  const localValuesOnly = <any>{}
+  let addedPaths = 'random-string-to-avoid-empty-string'
 
   // this controls which blocks exists only local and should be restored
   childrenContentBlocks?.forEach((childrenBlock: any, index: number) => {
-    const localValuesOnly = <any>{}
-    let addedPaths = 'random-string-to-avoid-empty-string'
     if (masterBlocksMap[childrenBlock.id]) {
       // block exists on master, update its content
       const indexToReplace = findIndex(finalBlocks, (block: any) => block?.id === childrenBlock?.id)
@@ -222,36 +186,13 @@ export async function repushSingleLocale(chidrenId: string, privateKey: string, 
           && typeof elem === 'object'
           && !currentPath.includes(addedPaths)
         ) {
-          localValuesOnly[currentPath] = this.node
+          localValuesOnly[childrenBlock.id + '.' + currentPath] = this.node
           addedPaths = currentPath
         }
       })
 
       // // clear block from null content or content not on local
       // newBlock = clearBlock(newBlock, childrenContentBlocks, localeToPush)
-
-      // restore existing content in childrenOnly
-      console.log('localValuesOnly before ', localValuesOnly)
-      Object.keys(localValuesOnly).map((keyPath: string) => {
-        const lastKey = keyPath.split('.').pop()
-        const isNumber = !isNaN(parseFloat(lastKey!))
-        if (deepGet(newBlock, keyPath) && isNumber) {
-          // it means that the value already exists on master and index is number,
-          // need to find next index available
-          let newIndex = Number(lastKey) + 1
-          console.log('new index to put ', newIndex, keyPath)
-          let newPath = keyPath.split('.').slice(0, -1).join('.') + `.${newIndex}`
-          while (deepGet(newBlock, newPath) !== undefined) {
-            newIndex++
-            newPath = keyPath.split('.').slice(0, -1).join('.') + `.${newIndex}`
-            console.log('new index, newPath', newIndex, newPath)
-          }
-          deepSet(newBlock, newPath, localValuesOnly[keyPath], true)
-        } else {
-          deepSet(newBlock, keyPath, localValuesOnly[keyPath], true)
-        }
-      })
-      
       finalBlocks[indexToReplace] = newBlock
     } else {
       // block doesnt exist on master, so
@@ -265,7 +206,69 @@ export async function repushSingleLocale(chidrenId: string, privateKey: string, 
     }
   })
 
-  // console.log('localValuesOnly to restore', localValuesOnly)
+  const childMap = <any>{}
+  childrenContentBlocks.forEach((block: any) => {
+    childMap[block?.id] = {...block}
+  })
+
+  const finalBlocksMap = <any>{}
+  finalBlocks.forEach((block: any) => {
+    finalBlocksMap[block?.id] = {...block}
+  })
+  // apply translation if exists and if default value on master is the same
+  Object.keys(childrenTranslationsMap).map((keyPath: string) => {
+    const path = keyPath.split('.').slice(1).join('.') // removing block id
+    const blockId = keyPath.split('.')[0]
+    if (!finalBlocksMap[blockId]) {
+      return
+    }
+    const defaultPath = replaceAll(path, `.${localeToPush}`, '.Default')
+    const defaultOnMaster = deepGet(finalBlocksMap[blockId], defaultPath)
+    const defaultOnChildren = deepGet(childMap[blockId], defaultPath)
+    let translatedValue = childrenTranslationsMap[keyPath]
+
+    // console.log('defaults comparison ', defaultOnMaster, defaultOnChildren, keyPath)
+    if (typeof defaultOnMaster === 'string' && defaultOnMaster !== defaultOnChildren) {
+      translatedValue = defaultOnMaster
+    } else if (typeof defaultOnMaster === 'object') {
+      const masterValue = JSON.stringify(defaultOnMaster)
+      const childrenValue = JSON.stringify(defaultOnChildren)
+      if (masterValue !== childrenValue) {
+        translatedValue = defaultOnMaster
+      }
+    }
+    deepSet(finalBlocksMap[blockId], path, translatedValue, true)
+  })
+
+  // apply new child blocks 
+  finalBlocks = Object.values(finalBlocksMap)
+
+  //  restore existing content in childrenOnly
+  // console.log('localValuesOnly before ', localValuesOnly)
+  // Object.keys(localValuesOnly).map((blockKeyPath: string) => {
+  //   const blockId = blockKeyPath.split('.')[0]
+  //   const keyPath = blockKeyPath.split('.').slice(1).join('.')
+  //   // const newBlock = 
+  //   const lastKey = keyPath.split('.').pop()
+  //   console.log('keypath aqui ', keyPath, finalBlocksMap, blockId, lastKey)
+  //   const isNumber = !isNaN(parseFloat(lastKey!))
+  //   if (deepGet(finalBlocksMap[blockId], keyPath) && isNumber) {
+  //     // it means that the value already exists on master and index is number,
+  //     // need to find next index available
+  //     let newIndex = Number(lastKey) + 1
+  //     console.log('new index to put ', newIndex, keyPath)
+  //     let newPath = keyPath.split('.').slice(0, -1).join('.') + `.${newIndex}`
+  //     while (deepGet(finalBlocksMap[blockId], newPath) !== undefined) {
+  //       newIndex++
+  //       newPath = keyPath.split('.').slice(0, -1).join('.') + `.${newIndex}`
+  //       console.log('new index, newPath', newIndex, newPath)
+  //     }
+  //     deepSet(finalBlocksMap[blockId], newPath, localValuesOnly[keyPath], true)
+  //   } else {
+  //     deepSet(finalBlocksMap[blockId], keyPath, localValuesOnly[keyPath], true)
+  //   }
+  // })
+  finalBlocks = Object.values(finalBlocksMap)
 
   // on repush, data fields should not be updated, only blocks
   const finalDataFields: any = {...childrenContent?.data}
@@ -280,8 +283,6 @@ export async function pushToLocales(localesToPublish: string[], cloneContent: an
   const createdEntries: any[] = []
   const currentLocaleTargets = getQueryLocales(appState?.designerState?.editingContentModel)
   let masterBlocks = (JSON.parse(cloneContent?.data?.blocksString)?? []).map((block: any) => ({...block, meta: {...block.meta, masterId: block.id}}));
-  const published = cloneContent?.published
-  const modelId = cloneContent?.modelId
 
   masterBlocks = masterBlocks.map((block: any) => {
     return tagMasterBlockOptions(block)
@@ -289,11 +290,10 @@ export async function pushToLocales(localesToPublish: string[], cloneContent: an
   // updating master content with gm_tags
   // await pushBlocks(cloneContent?.id, modelName, masterBlocks,
   //   published, modelId, privateKey)
+  const masterData = cloneContent?.data
 
   const results = localesToPublish.map(async (locale: string) => {
     let newBlocks = localizeBlocks(masterBlocks, locale, false)
-
-    const masterData = cloneContent?.data
     const newData = localizeDataFromMaster(masterData, locale)
     const localeTarget = {
       "@type": "@builder.io/core:Query",
@@ -333,34 +333,24 @@ export async function pushToLocales(localesToPublish: string[], cloneContent: an
     const entryCreated = await result.json();
 
     createdEntries.push({id: entryCreated.id, target: localeTarget, name: entryCreated.name})
-
-    // last iteraction, updates parent with children references
-    if (createdEntries.length === localesToPublish.length) {
-      const newLocaleReferences = [
-        ...masterData?.localeChildren?? [],
-        ...createdEntries.map((item) => ({
-          name: item.name,
-          // reference: {
-          //   "@type": "@builder.io/core:Reference",
-          //   "model": modelName,
-          //   "id": item.id,
-          // },
-          // reference: {
-          //   id: item.id,
-          // },
-          modelName,
-          referenceId: item.id,
-          target: item.target
-        }))
-      ]
-      await updateParentWithReferences(newLocaleReferences, privateKey, modelName)
-    }
     return result;
   })
 
-  const success = await Promise.all(results)
+  const success = await Promise.all(results.map(p => p.catch(e => e)))
+  const validResults = success.filter(result => !(result instanceof Error));
+  // console.log('validResults ', validResults)
+  const newLocaleReferences = [
+    ...masterData?.localeChildren?? [],
+    ...createdEntries.map((item) => ({
+      name: item.name,
+      modelName,
+      referenceId: item.id,
+      target: item.target
+    }))
+  ]
+  await updateParentWithReferences(newLocaleReferences, privateKey, modelName)
   // returns true if no errors happened on any calls
-  return !(success).filter((response) => response.status !== 200).length
+  return validResults.length === localesToPublish.length;
 
 }
 

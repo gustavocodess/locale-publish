@@ -3,9 +3,9 @@ interface Payload {
   query?: any[];
   data: any;
   name?: string;
-  // modelId: string;
-  // published: string;
-  // id: string;
+  modelId?: string;
+  published?: string;
+  id?: string;
 }
 
 export async function updateChildren(
@@ -14,7 +14,8 @@ export async function updateChildren(
   newQuery: any[] = [],
   published: string,
   modelId: string,
-  newName?: string
+  newName?: string,
+  isForce: boolean = false
 
 ) {
   // !IMPORTANT: Remove all unwanted fields from parentData
@@ -27,10 +28,6 @@ export async function updateChildren(
 
   const newPayload: Payload = {
     // updates the url path for the locale
-    // ! used for not live update
-    // modelId: modelId,
-    // published: published,
-    // id: contentId,
     name: newName,
     query: [
       ...newQuery,
@@ -47,9 +44,16 @@ export async function updateChildren(
     delete newPayload.name
   }
 
+  let fetchUrl =  `https://builder.io/api/v1/write/${modelName}/${contentId}`
+  if (!isForce || published === 'published') {
+    fetchUrl+= '?autoSaveOnly=true'
+    newPayload.published = published
+    newPayload.modelId = modelId
+    newPayload.id = contentId
+  }
   const res2 = await fetch(
     // ?autoSaveOnly=true
-    `https://builder.io/api/v1/write/${modelName}/${contentId}`,
+    fetchUrl,
     {
       method: 'PATCH',
       headers: {

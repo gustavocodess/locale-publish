@@ -148,7 +148,9 @@ export function localizeBlocks(masterBlocks: any[], locale: string, isRepush: bo
         // const valueToTranslate = deepGet(block, path)
         const valueToTranslate = childrenTranlationsMap[localizedPathId]
         // deepSet(block, path.replace('Default', locale), valueToTranslate, true)
-        deepSet(block, this.path.slice(0, -1).join('.') + `.${locale}`,valueToTranslate, true)
+        if (valueToTranslate !== undefined) {
+          deepSet(block, this.path.slice(0, -1).join('.') + `.${locale}`,valueToTranslate, true)
+        }
       }
       // else if (
       //   path.endsWith('Default')
@@ -160,7 +162,9 @@ export function localizeBlocks(masterBlocks: any[], locale: string, isRepush: bo
         // means there is no translation on local block
         // so we can just push the default value
         const valueToTranslate = deepGet(block, path)
-        deepSet(block, localizedPath ,valueToTranslate, true)
+        if (valueToTranslate !== undefined) {
+          deepSet(block, localizedPath ,valueToTranslate, true)
+        }
       }
     } else {
       // works for first push and force push
@@ -213,24 +217,7 @@ export function tagMasterBlockOptions(block: BuilderBlock) {
       // deepSet(newBlock, currentPath + '.gm_tag', `_GL-${crypto.randomUUID()}`, true)
       deepSet(newBlock, currentPath , {...value, gm_tag: true}, true)
     }
-    // if (
-    //   pathAbove.join('.').endsWith('Default')
-    //   && !deepGet(newBlock, currentPath + '.gm_tag')
-    //   && typeof this.node === 'object'
-    //   // ! why does not work?
-    //   //  && !this.node?.gm_tag
-    //   ) {
-    //     // && typeof this.node === 'object'
-    //   // && !deepGet(newBlock, currentPath + '.gm_tag') 
-    //   deepSet(newBlock, currentPath + '.gm_tag', `_GL-${crypto.randomUUID()}`, true)
-    //   // ! why does not work?
-    //   // this.node = {
-    //   //   ...this.node,
-    //   //   gm_tag: `_GL-${crypto.randomUUID()}`
-    //   // }
-    // }
   })
-  // console.log('tagged block ', newBlock)
   return newBlock;
 }
 

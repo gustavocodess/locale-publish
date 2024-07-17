@@ -145,6 +145,7 @@ registerPlugin(
         return isGlobal;
       },
       async onClick(content) {
+        appState.globalState.showGlobalBlockingLoading('Grabbing data...');
         const locale = appState.designerState?.activeLocale || 'Default';
         const modelName = content.modelName;
 
@@ -178,7 +179,7 @@ registerPlugin(
           appState.snackBar.show(`Pushed content to ${localesToPublish.join(' & ')}.`);
           // update parent with children references created
         } else {
-          appState.snackBar.show(`Error pushing for ${locale}. Contact Admin.`);
+          appState.snackBar.show(`Some locales might have not be pushed. Contact Admin.`);
         }
         appState.globalState.hideGlobalBlockingLoading();
         }

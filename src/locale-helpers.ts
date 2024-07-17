@@ -1,10 +1,12 @@
 import traverse from "traverse";
 import appState from '@builder.io/app-context';
 import { pushBlocks, pushLocale, updateChildren } from "./locale-service";
+import { duplicateDefaultValuesToLocaleValues, getLocaleFromPage } from './utils/locales';
+import { addUniqueIdsInBlocks, mergeBlocks} from "./utils/blocks";
 import { clearBlock, deepGet, deepSet, fastClone, getQueryLocales, localizeBlocks, localizeDataFromMaster, replaceAll, tagMasterBlockOptions } from "./plugin-helpers";
 import { findIndex } from "lodash";
 import { get } from "https";
-// @ts-
+
 interface BuilderBlock {
   responsiveStyles: any;
   meta: any;
@@ -52,15 +54,19 @@ export function mergeLocalizedBlock(masterBlock: any, childrenBlock: any, locale
 
 export async function forcePushLocale(chidrenId: string, privateKey: string, apiKey: string, modelName: string) {
   const masterContent = fastClone(appState?.designerState?.editingContentModel)
-  const masterBlocks = (JSON.parse(masterContent?.data?.blocksString)).filter((block: any) => !block?.id.includes('pixel'))
+  let masterBlocks = (JSON.parse(masterContent?.data?.blocksString)).filter((block: any) => !block?.id.includes('pixel'))
   const childrenContent = await (await fetch(`https://cdn.builder.io/api/v3/content/${modelName}/${chidrenId}?apiKey=${apiKey}&cachebust=true&includeUnpublished=true`)).json();
 
   const childrenLocale = childrenContent?.query.filter((query: any) => query?.property === 'locale')[0]?.value[0]
   const masterLocale = masterContent?.query.filter((query: any) => query?.property === 'locale')[0]?.value[0]
 
+  masterBlocks = addUniqueIdsInBlocks(masterBlocks);
+  await pushBlocks(masterContent?.id, modelName, masterBlocks, privateKey);
+
   // tagging and localizing master blocks
   let newBlocks = localizeBlocks(masterBlocks, childrenLocale, false)
   newBlocks = newBlocks.map((block: any) => tagMasterBlockOptions(block))
+  
   // creating final blocks based on master content only
   const finalBlocks = [...newBlocks.map((block: any) => ({...block, meta: {...block.meta, masterId: block.id}}))]
   const finalDataFields: any = localizeDataFromMaster(masterContent.data, childrenLocale)
@@ -279,6 +285,7 @@ export async function repushSingleLocale(chidrenId: string, privateKey: string, 
 
 }
 
+
 export async function pushToLocales(localesToPublish: string[], cloneContent: any, privateKey: string, modelName: string) {
   const createdEntries: any[] = []
   const currentLocaleTargets = getQueryLocales(appState?.designerState?.editingContentModel)
@@ -291,6 +298,9 @@ export async function pushToLocales(localesToPublish: string[], cloneContent: an
   // await pushBlocks(cloneContent?.id, modelName, masterBlocks,
   //   published, modelId, privateKey)
   const masterData = cloneContent?.data
+
+  masterBlocks = addUniqueIdsInBlocks(masterBlocks);
+  await pushBlocks(cloneContent?.id, modelName, masterBlocks, privateKey)
 
   const results = localesToPublish.map(async (locale: string) => {
     let newBlocks = localizeBlocks(masterBlocks, locale, false)

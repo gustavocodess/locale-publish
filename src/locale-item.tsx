@@ -1,5 +1,5 @@
 import { IconButton, Tooltip, Typography, Divider } from '@material-ui/core';
-import { RemoveRedEye, Publish, Language, Code, SettingsRemote } from '@material-ui/icons';
+import { RemoveRedEye, Publish, Language, Code, SettingsRemote, CallMerge } from '@material-ui/icons';
 import React from 'react';
 interface Props {
   item: {
@@ -17,11 +17,12 @@ interface Props {
     }
   }
   onPush: (childrenId: string) => void;
+  onPush2: (childrenId: string) => void;
   onForcePush: (childrenId: string) => void;
 }
 
 const LocaleItem = (props: Props) => {
-  const { item, onPush, onForcePush } = props
+  const { item, onPush, onPush2, onForcePush } = props
   if (!item || !item?.referenceId) return null
 
   return (
@@ -54,6 +55,14 @@ const LocaleItem = (props: Props) => {
               onClick={() =>  onPush(item?.referenceId)}
             >
               <Publish css={{ opacity: 0.7, fontSize: 20 }} />
+            </IconButton>
+          </Tooltip>
+          <Tooltip enterDelay={100} title="Re-Push for locale (merge)" placement="left">
+            <IconButton
+              css={{ position: 'absolute', top: 0, right: 0 }}
+              onClick={() =>  onPush2(item?.referenceId)}
+            >
+              <CallMerge css={{ opacity: 0.7, fontSize: 20 }} />
             </IconButton>
           </Tooltip>
         </div>

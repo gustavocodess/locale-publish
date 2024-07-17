@@ -9,6 +9,8 @@ import { fastClone, tagMasterBlockOptions } from './plugin-helpers';
 import { getPushConfirmation } from './snackbar-utils';
 import { pushBlocks } from './locale-service';
 
+import { repush } from "./services/repush";
+
 interface Props {
   privateKey: string;
 }
@@ -37,6 +39,7 @@ const LocalesTab = (props: Props) => {
     await appState.globalState.hideGlobalBlockingLoading();
   };
 
+  // Approach I - in ./locales-helpers.ts
   const handlePushChanges = async (childrenId: string) => {
     const masterContent = fastClone(appState?.designerState?.editingContentModel)
     let masterBlocks = (JSON.parse(masterContent?.data?.blocksString)).filter((block: any) => !block?.id.includes('pixel'))
@@ -45,6 +48,14 @@ const LocalesTab = (props: Props) => {
     //   masterContent.published, masterContent.modelId, privateKey)
 
     const result = await repushSingleLocale(childrenId, privateKey, apiKey, modelName)
+    if (result.status === 200) {
+      appState?.snackBar.show(`Suceessfully updated ${childrenId} with new blocks.`);
+    }
+  };
+
+  // Approach II - in ./services/repush.ts
+  const handlePushChanges2 = async (childrenId: string) => {
+    const result = await repush(childrenId, privateKey, apiKey, modelName)
     if (result.status === 200) {
       appState?.snackBar.show(`Suceessfully updated ${childrenId} with new blocks.`);
     }
@@ -89,6 +100,7 @@ const LocalesTab = (props: Props) => {
               key={`locale-item-${locale?.referenceId}`}
               item={locale}
               onPush={() => handlePushChanges(locale?.referenceId)}
+              onPush2={() => handlePushChanges2(locale?.referenceId)}
               onForcePush={() => handleForcePush(locale?.referenceId)}
             />
           )

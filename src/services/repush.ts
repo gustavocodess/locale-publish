@@ -11,7 +11,7 @@ const fastClone = (obj: any) =>
 
 export async function repush(childId: string, privateKey: string, apiKey: string, modelName: string) {
 
-  console.log('Debug: Re-Push Scenario (Approach II), v0.0.6');
+  console.log('Debug: Re-Push Scenario (Approach II), v207');
 
   try {
 

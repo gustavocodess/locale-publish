@@ -54,11 +54,15 @@ export function mergeLocalizedBlock(masterBlock: any, childrenBlock: any, locale
 
 export async function forcePushLocale(chidrenId: string, privateKey: string, apiKey: string, modelName: string) {
   const masterContent = fastClone(appState?.designerState?.editingContentModel)
-  const masterBlocks = (JSON.parse(masterContent?.data?.blocksString)).filter((block: any) => !block?.id.includes('pixel'))
+  let masterBlocks = (JSON.parse(masterContent?.data?.blocksString)).filter((block: any) => !block?.id.includes('pixel'))
   const childrenContent = await (await fetch(`https://cdn.builder.io/api/v3/content/${modelName}/${chidrenId}?apiKey=${apiKey}&cachebust=true&includeUnpublished=true`)).json();
 
   const childrenLocale = childrenContent?.query.filter((query: any) => query?.property === 'locale')[0]?.value[0]
   const masterLocale = masterContent?.query.filter((query: any) => query?.property === 'locale')[0]?.value[0]
+
+  masterBlocks = addUniqueIdsInBlocks(masterBlocks);
+  await pushBlocks(masterContent?.id, modelName, masterBlocks, privateKey);
+
   const newBlocks = localizeBlocks(masterBlocks, childrenLocale)
   // creating final blocks based on master content only
   const finalBlocks = [...newBlocks.map((block: any) => ({...block, meta: {...block.meta, masterId: block.id}}))]

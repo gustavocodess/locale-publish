@@ -219,12 +219,11 @@ export const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): 
 
       const result = childArray.map((childItem: any) => {
         if (childItem.uniqueId && masterMap.has(childItem.uniqueId)) {
-          return {
-            ...masterMap.get(childItem.uniqueId),
-            ...childItem,
-          };
+          return childItem;
         }
-        return childItem;
+        if (!childItem.uniqueId){
+          return childItem;
+        }
       });
 
       masterArray.forEach((masterItem: any) => {
@@ -237,7 +236,6 @@ export const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): 
           }
         }
       });
-
       return result;
     };
 
@@ -250,6 +248,7 @@ export const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): 
           const snapshotKey = `${key}_masterSnapshot`;
           const snapshot = childObject[snapshotKey];
           mergedObject[key] = mergeArrays(masterArray, childObject[key], snapshot, snapshotKey);
+          mergedObject[snapshotKey] = btoa(JSON.stringify(mergedObject[key]));
         } else if (typeof childObject[key] === 'object' && childObject[key] !== null) {
           const snapshotKey = `${key}_masterSnapshot`;
           const snapshot = childObject[snapshotKey];
@@ -260,8 +259,6 @@ export const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): 
             } else {
               mergedObject[key] = mergeObjects(masterObject?.[key] || {}, childObject[key]);
             }
-          } else {
-            mergedObject[key] = mergeObjects(masterObject?.[key] || {}, childObject[key]);
           }
         } else if (typeof childObject[key] !== 'undefined' && !Array.isArray(childObject[key]) && !key.endsWith('_masterSnapshot') && !excludedProperties.includes(key)) {
           const snapshotKey = `${key}_masterSnapshot`;
@@ -324,7 +321,9 @@ export const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): 
           if (snapshot) {
             const decodedSnapshot = JSON.parse(atob(snapshot));
             if (JSON.stringify(newOptions[key]) === JSON.stringify(decodedSnapshot)) {
-              newOptions[key] = masterOptions?.[key];
+              if (masterOptions?.[key]){
+                newOptions[key] = masterOptions?.[key];
+              }
             } else {
               newOptions[key] = updateOptionsWithSnapshots(newOptions[key], masterOptions?.[key]);
             }

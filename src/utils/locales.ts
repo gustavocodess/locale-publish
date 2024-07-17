@@ -1,5 +1,6 @@
 export const duplicateDefaultValuesToLocaleValues = (blocks: any[], locale: string): any[] => {
   const defaultLocale = 'Default';
+
   const traverseOptions = (options: any) => {
     for (const key in options) {
       if (options.hasOwnProperty(key)) {
@@ -7,8 +8,9 @@ export const duplicateDefaultValuesToLocaleValues = (blocks: any[], locale: stri
         if (value && typeof value === 'object' && value["@type"] === "@builder.io/core:LocalizedValue") {
           if (!value[locale] && value[defaultLocale]) {
             value[locale] = value[defaultLocale];
+            console.log(`Set ${locale} value to ${defaultLocale} value for key: ${key}`);
           }
-        } else if (value && typeof value === 'object') {
+        } else if (value && typeof value === 'object' && !Array.isArray(value)) {
           traverseOptions(value);
         } else if (Array.isArray(value)) {
           value.forEach(item => {

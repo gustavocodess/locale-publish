@@ -8,7 +8,6 @@ export const duplicateDefaultValuesToLocaleValues = (blocks: any[], locale: stri
         if (value && typeof value === 'object' && value["@type"] === "@builder.io/core:LocalizedValue") {
           if (!value[locale] && value[defaultLocale]) {
             value[locale] = value[defaultLocale];
-            console.log(`Set ${locale} value to ${defaultLocale} value for key: ${key}`);
           }
         } else if (value && typeof value === 'object' && !Array.isArray(value)) {
           traverseOptions(value);

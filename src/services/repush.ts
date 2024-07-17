@@ -11,7 +11,7 @@ const fastClone = (obj: any) =>
 
 export async function repush(childId: string, privateKey: string, apiKey: string, modelName: string) {
 
-  console.log('Debug: Re-Push Scenario (Approach II), v207');
+  console.log('Debug: Re-Push Scenario (Approach II), v0.0.7');
 
   try {
 
@@ -34,6 +34,10 @@ export async function repush(childId: string, privateKey: string, apiKey: string
     console.log('Debug: childBlocks', childBlocks);
     console.log('Debug: masterBlocks', masterBlocks);
     console.log('Debug: resultBlocks', resultBlocks);
+
+    if (resultBlocks?.length === 0) {
+      throw new Error('Error in repush: resultBlocks is undefined or null. Please try again');
+    }
 
     const childData: any = { ...child?.data };
     const result = await updateChildren(childId, privateKey, resultBlocks, modelName, childData);

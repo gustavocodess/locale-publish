@@ -1,12 +1,13 @@
 import { Builder, BuilderContent } from '@builder.io/react';
-import * as React from 'react';
+import React from 'react'
 import {
   Language,
 } from '@material-ui/icons';
 import LocalesTab from './locales-tab';
-import { Tooltip } from '@material-ui/core';
+import Tooltip from '@material-ui/core/Tooltip';
 import traverse from 'traverse';
 import { BuilderBlock } from '@builder.io/react/dist/types/src/components/builder-block.component';
+import { set, unset } from 'lodash';
 
 
 export type BulkAction = {
@@ -51,7 +52,9 @@ export function registerEditorOnLoad(reactionCallback: (actions: ContentEditorAc
 export function registerLocalesTab(privateKey: string) {
   Builder.register('editor.editTab', {
     name: (
+      // @ts-ignore next-line
       <Tooltip title="Locales">
+        {/* @ts-ignore next-line */}
         <Language style={{ fontSize: 20, marginRight: 6 }} />
       </Tooltip>
     ),
@@ -96,15 +99,7 @@ export const fastClone = (obj: any) =>
 
 
 export const deepGet = (obj: any, newPath: string) => {
-  for (let i = 0, path = newPath.split('.'), len=path.length; i<len; i++){
-    if (path[i] && obj[path[i]]) {
-      obj = obj[path[i]];
-    } else {
-      // console.log('deepGet error: ', obj, newPath);
-      return undefined;
-    }
-  };
-  return obj;
+  return traverse(obj).get(newPath.split('.')) || undefined
 };
 
 function isObject(obj: any) {
@@ -137,20 +132,47 @@ export const deepSet = (obj: any, path: string, value: any, create: boolean) => 
 }
 
 
-export function localizeBlocks(blocks: any[], locale: string) {
+export function localizeBlocks(masterBlocks: any[], locale: string, isRepush: boolean, childrenTranlationsMap?: any) {
   const newBlocks:any[] =  []
-  blocks.forEach((block: BuilderBlock) => {
-    const blockToTraverse = {...blocks}
-    // @ts-ignore next-line
-    delete blockToTraverse.responsiveStyles
-    // @ts-ignore next-line
-    delete blockToTraverse.meta
-
+  masterBlocks.forEach((block: BuilderBlock) => {
   traverse(block).map(function () {
     const path = this.path.join('.')
-    if (path.endsWith('Default')) {
-      const valueToTranslate = deepGet(block, path)
-      deepSet(block, path.replace('Default', locale), valueToTranslate, true)
+    if (path.includes('meta') || path.includes('responsiveStyles')) {
+      return
+    }
+
+    const localizedPath = replaceAll(path, '.Default', `.${locale}`)
+      const localizedPathId = block?.id +'.' + localizedPath
+    if (isRepush) {
+      if (path.endsWith('Default') && Boolean(childrenTranlationsMap[localizedPathId])) {
+        // const valueToTranslate = deepGet(block, path)
+        const valueToTranslate = childrenTranlationsMap[localizedPathId]
+        // deepSet(block, path.replace('Default', locale), valueToTranslate, true)
+        if (valueToTranslate !== undefined) {
+          deepSet(block, this.path.slice(0, -1).join('.') + `.${locale}`,valueToTranslate, true)
+        }
+      }
+      // else if (
+      //   path.endsWith('Default')
+      //   && childrenTranlationsMap[block?.id +'.' + replaceAll(path, '.Default', `.${locale}`)] === undefined) {
+      //   // deepSet(block, path, null, true)
+      //   unset(block, path)
+      // }
+      else if (path.endsWith('Default') && !childrenTranlationsMap[localizedPathId]) {
+        // means there is no translation on local block
+        // so we can just push the default value
+        const valueToTranslate = deepGet(block, path)
+        if (valueToTranslate !== undefined) {
+          deepSet(block, localizedPath ,valueToTranslate, true)
+        }
+      }
+    } else {
+      // works for first push and force push
+      if (path.endsWith('Default')) {
+        const valueToTranslate = deepGet(block, path)
+        // deepSet(block, this.path.slice(0, -1).join('.') + `.${locale}`,valueToTranslate, true)
+        deepSet(block, localizedPath, valueToTranslate, true)
+      }
     }
   })
     newBlocks.push(block)
@@ -165,6 +187,8 @@ export function localizeDataFromMaster(masterData: BuilderContent, locale: strin
   delete newData.blocksString
   // @ts-ignore next-line
   delete newData.blocks
+  // @ts-ignore next-line
+  delete newData.meta
 
   traverse(newData).map(function () {
     const path = this.path.join('.') 
@@ -180,10 +204,61 @@ export function tagMasterBlockOptions(block: BuilderBlock) {
   const newBlock = {...block}
   traverse(newBlock).map(function () {
     const currentPath = this.path.join('.')
-    const pathAbove = this.path.slice(0, -1)
-    if (pathAbove.join('.').endsWith('Default') && !deepGet(newBlock, currentPath + '.gm_tag')) {
-      deepSet(newBlock, currentPath + '.gm_tag', `_GL-${crypto.randomUUID()}`, true)
+    const value = this.node
+    const hasTag = value?.gm_tag
+    if (
+      currentPath.startsWith('component.options')
+      // mark only default?
+      && currentPath.includes('Default')
+      && !hasTag
+      && typeof value === 'object'
+      && !Array.isArray(value)
+    ) {
+      // deepSet(newBlock, currentPath + '.gm_tag', `_GL-${crypto.randomUUID()}`, true)
+      deepSet(newBlock, currentPath , {...value, gm_tag: true}, true)
     }
   })
   return newBlock;
+}
+
+export const clearBlock = (block: any, childrenBlocks: any, locale: string) => {
+  const childrensMap: Record<string, any> = {}
+  childrenBlocks.forEach((child: BuilderBlock) => {
+    // @ts-ignore next-line
+    childrensMap[child.id] = child
+  })
+  let newBlock = {...block}
+  traverse(newBlock).map(function () {
+    const path = this.path.join('.')
+    const pathAbove = this.path.slice(0, -1).join('.')
+    if (this.node === null
+      || this.node === undefined
+      || (
+        (pathAbove.endsWith('Default'))
+        && typeof this.node === 'object'
+        && (childrensMap[block.id] && deepGet(childrensMap[block.id], replaceAll(path, '.Default', `.${locale}`)) === undefined)
+      )
+    ) {
+      // console.log('deleting this ', replaceAll(path, '.Default', `.${locale}`), this.node)
+      const lastKey = Number(path.split('.').pop())
+      if (typeof lastKey === 'number') {
+        // it means its an array
+        const localPath = replaceAll(path, '.Default', `.${locale}`)
+        if (deepGet(newBlock, localPath)) {
+          const arrayPath = localPath.split('.').slice(0, -1).join('.')
+          const newArray = [...deepGet(newBlock, arrayPath)]
+          newArray.splice(lastKey, 1)
+          deepSet(newBlock, arrayPath, newArray, true)
+        }
+      } else {
+        // unset object
+        unset(newBlock, replaceAll(path, '.Default', `.${locale}`))
+      }
+    }
+  })
+  return newBlock;
+}
+
+export const replaceAll = (str: string, find: string, replace: string) => {
+  return str.replace(new RegExp(find, 'g'), replace)
 }

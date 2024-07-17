@@ -30,6 +30,7 @@ interface ElementProps {
 }
 
 const LocaleConfigurationEditor: React.FC<Props> = props => {
+  appState.globalState.showGlobalBlockingLoading('Fetching necessary data...');
   const store = useLocalStore(() => ({
     targetLangs: [] as string[],
     get availableLangs(): string[] {

@@ -41,6 +41,12 @@ const LocalesTab = (props: Props) => {
 
   // Approach I - in ./locales-helpers.ts
   const handlePushChanges = async (childrenId: string) => {
+    const masterContent = fastClone(appState?.designerState?.editingContentModel)
+    let masterBlocks = (JSON.parse(masterContent?.data?.blocksString)).filter((block: any) => !block?.id.includes('pixel'))
+    masterBlocks = masterBlocks.map((block: any) => (tagMasterBlockOptions(block)));
+    // await pushBlocks(parentId, modelName, masterBlocks,
+    //   masterContent.published, masterContent.modelId, privateKey)
+
     const result = await repushSingleLocale(childrenId, privateKey, apiKey, modelName)
     if (result.status === 200) {
       appState?.snackBar.show(`Suceessfully updated ${childrenId} with new blocks.`);
@@ -64,7 +70,8 @@ const LocalesTab = (props: Props) => {
     const masterContent = fastClone(appState?.designerState?.editingContentModel)
     let masterBlocks = (JSON.parse(masterContent?.data?.blocksString)).filter((block: any) => !block?.id.includes('pixel'))
     masterBlocks = masterBlocks.map((block: any) => (tagMasterBlockOptions(block)));
-    await pushBlocks(parentId, modelName, masterBlocks, privateKey)
+    // await pushBlocks(parentId, modelName, masterBlocks,
+    //   masterContent?.published, masterContent?.modelId, privateKey)
 
     const results = localeChildren.map(async (locale: any) => await repushSingleLocale(locale?.referenceId, privateKey, apiKey, modelName))
     const final = await Promise.all(results)
@@ -103,6 +110,7 @@ const LocalesTab = (props: Props) => {
           width: '100%', backgroundColor: 'white', position: 'absolute', bottom: 0, left: 0,
           display: 'flex', flexDirection: 'row', justifyContent: 'center',
         }}>
+          {/* @ts-ignore next-line */}
         <Button onClick={handlePushBatchChanges} color="primary" disabled={!localeChildren.length}>
           push changes to all locales ({localeChildren.length})
         </Button>

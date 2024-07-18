@@ -1,49 +1,31 @@
+/*
+Functions:
+
+ Exported:
+  addUniqueIdsInBlocks
+  mergeBlocks
+
+ Internal:
+  mergeArrays
+  mergeLocalizedValue
+  mergeComponentOptions
+  getArrayStructureSnapshot
+  getId
+
+ */
+
 import { BuilderElement } from "@builder.io/react";
+import { debugMode } from "./consts";
 
-const excludedProperties = ['children', 'uniqueId', '@type', 'shouldTranslate'];
+const excludedProperties = ['children', 'id', '@type', 'Default', 'shouldTranslate'];
 
-const mergeLocalizedValues = (masterValue: any, childValue: any): any => {
-  if (typeof masterValue === 'object' && masterValue["@type"] === "@builder.io/core:LocalizedValue") {
-    const updatedValue = { ...childValue };
-
-    const decodedChildSnapshot = childValue.Default_masterSnapshot ? JSON.parse(atob(childValue.Default_masterSnapshot)) : null;
-
-    if (masterValue.Default !== decodedChildSnapshot) {
-      updatedValue.Default = masterValue.Default;
-      Object.keys(childValue).forEach((key) => {
-        if (key !== 'Default' && key !== 'Default_masterSnapshot' && key !== '@type') {
-          updatedValue[key] = masterValue.Default;
-        }
-      });
-    }
-
-    return updatedValue;
-  }
-  return childValue;
-};
-
-const mergeLocalizedValuesInBlocks = (master: any, child: any): any => {
-  const mergedObject = { ...child };
-
-  Object.keys(child).forEach((key) => {
-    if (typeof child[key] === 'object' && !Array.isArray(child[key]) && child[key] !== null) {
-      if (master[key] && master[key]["@type"] === "@builder.io/core:LocalizedValue") {
-        mergedObject[key] = mergeLocalizedValues(master[key], child[key]);
-      } else {
-        mergedObject[key] = mergeLocalizedValuesInBlocks(master[key] || {}, child[key]);
-      }
-    } else if (Array.isArray(child[key])) {
-      mergedObject[key] = child[key].map((item: any, index: number) => {
-        return mergeLocalizedValuesInBlocks(master[key]?.[index] || {}, item);
-      });
-    }
-  });
-
-  return mergedObject;
-};
-
-const generateUniqueId = (): string => {
+const getUniqueId = (): string => {
   return 'id-' + Math.random().toString(36).substr(2, 16);
+};
+
+const getArrayStructureSnapshot = (fullArray: any[]): any => {
+  const snapshotArray = fullArray.map(item => ({ id: item.id })) || [];
+  return snapshotArray;
 };
 
 export const addUniqueIdsInBlocks = (obj: any): any => {
@@ -52,17 +34,13 @@ export const addUniqueIdsInBlocks = (obj: any): any => {
       if (Array.isArray(current)) {
         const updatedArray = current.map((item) => {
           if (typeof item === 'object' && item !== null) {
-            if (!item.uniqueId) {
-              item.uniqueId = generateUniqueId();
+            if (!item.id) {
+              item.id = getUniqueId();
             }
             return { ...item, ...traverse(item) };
           }
           return item;
         });
-        if (parent && propertyName && !propertyName.endsWith('_masterSnapshot') && !excludedProperties.includes(propertyName)) {
-          const snapshotArray = updatedArray.map(item => ({ uniqueId: item.uniqueId }));
-          parent[`${propertyName}_masterSnapshot`] = btoa(JSON.stringify(snapshotArray));
-        }
         return updatedArray;
       } else if (typeof current === 'object' && current !== null) {
         let newObj: any = { ...current };
@@ -71,27 +49,21 @@ export const addUniqueIdsInBlocks = (obj: any): any => {
             newObj[key] = traverse(current[key], newObj, key);
           }
         }
-        if (parent && propertyName && !propertyName.endsWith('_masterSnapshot') && !excludedProperties.includes(propertyName)) {
-          parent[`${propertyName}_masterSnapshot`] = btoa(JSON.stringify(newObj));
-        }
         return newObj;
-      } else if (parent && propertyName && !propertyName.endsWith('_masterSnapshot') && !excludedProperties.includes(propertyName)) {
-        parent[`${propertyName}_masterSnapshot`] = btoa(JSON.stringify(current));
       }
       return current;
     } catch (error) {
-      console.error('Error in traverse function:', error);
+      console.error('Error in unique Ids function:', error);
       return current;
     }
   };
-
-  const addUniqueIdToComponent = (block: BuilderElement): BuilderElement => {
+  const addUniqueIdToComponent = (block: any): BuilderElement => {
     try {
       if (!block?.component?.options) {
         return block;
       }
-      if (!block.component.options.uniqueId) {
-        block.component.options.uniqueId = generateUniqueId();
+      if (!block.component.options.id) {
+        block.component.options.id = getUniqueId();
       }
       block.component.options = traverse(block.component.options);
       return block;
@@ -100,7 +72,6 @@ export const addUniqueIdsInBlocks = (obj: any): any => {
       return block;
     }
   };
-
   try {
     if (Array.isArray(obj)) {
       return obj.map(addUniqueIdToComponent) as BuilderElement[];
@@ -113,273 +84,152 @@ export const addUniqueIdsInBlocks = (obj: any): any => {
   }
 };
 
+const mergeArrays = (masterArray: any[], childArray: any[], snapshot: any): any[] => {
 
+  if (!masterArray || !childArray){
+    return childArray;
+  }
 
-const correctComponentPositions = (masterBlocks: BuilderElement[], childBlocks: BuilderElement[], mergedBlocks: BuilderElement[]): BuilderElement[] => {
+  let mergedArrays:any = [];
 
-  const baseComponents: BuilderElement[] = [];
+  if (debugMode) console.log('Debug: Merging, childArray',childArray);
+  if (debugMode) console.log('Debug: With, masterArray',masterArray);
 
-  mergedBlocks.forEach(block => {
-    if (block.id && masterBlocks.some(mBlock => mBlock.id === block.id) && childBlocks.some(cBlock => cBlock.id === block.id)) {
-      baseComponents.push(block);
-    }
-  });
+  // Child & Common Elements
+  childArray.forEach((childItem: any) => {
+    if (childItem && typeof childItem !== undefined){
 
-  masterBlocks.forEach(block => {
-    if (!baseComponents.some(baseBlock => baseBlock.id === block.id)) {
-      const index = masterBlocks.findIndex(mBlock => mBlock.id === block.id);
-      baseComponents.splice(index, 0, block);
-    }
-  });
-
-  childBlocks.forEach(block => {
-    if (!baseComponents.some(baseBlock => baseBlock.id === block.id)) {
-      const index = childBlocks.findIndex(cBlock => cBlock.id === block.id);
-      const nextChildBlock = childBlocks[index + 1];
-      const prevChildBlock = childBlocks[index - 1];
-
-      let insertIndex = baseComponents.length; // Default to end
-
-      if (nextChildBlock) {
-        const nextIndex = baseComponents.findIndex(baseBlock => baseBlock.id === nextChildBlock.id);
-        if (nextIndex !== -1) {
-          insertIndex = nextIndex;
-        }
-      } else if (prevChildBlock) {
-        const prevIndex = baseComponents.findIndex(baseBlock => baseBlock.id === prevChildBlock.id);
-        if (prevIndex !== -1) {
-          insertIndex = prevIndex + 1;
-        }
+      if (childItem.id && masterArray.some(item => item.id === childItem.id)) {
+        if (debugMode) console.log(`Debug: Added item (available on master & child) ${childItem.id}`,childItem)
+        mergedArrays.push(childItem);
+      }
+      if (!childItem.id || !masterArray.some(item => item.id === childItem.id)){
+        if (debugMode) console.log('Debug: Added child element (created on child)',childItem)
+        mergedArrays.push(childItem);
       }
 
-      baseComponents.splice(insertIndex, 0, block);
+      if (snapshot && childItem.id && !masterArray.some(item => item.id === childItem.id)){
+        if (debugMode) console.log(`Debug: Removed old element ${childItem.id}`,childItem)
+        mergedArrays = mergedArrays.filter((item: { id: any; }) => item.id !== childItem.id);
+      }
+
     }
+
   });
 
-  return baseComponents;
+  masterArray.forEach((masterItem: any) => {
+    if (masterItem && typeof masterItem !== undefined){
+      if (masterItem.id && !childArray.some(item => item.id === masterItem.id)) {
+        if (snapshot) {
+          if (!snapshot.some((item: { id: any; }) => item.id === masterItem.id)){
+            if (debugMode) console.log('Debug: Added new Element to List',masterItem)
+            mergedArrays.push(masterItem);
+          }
+        }else{
+          if (debugMode) console.log('Debug: Added new Element to List',masterItem)
+          mergedArrays.push(masterItem);
+        }
+      }
+    }
+
+  });
+
+  if(debugMode) console.log('Debug: Arrays after merging',mergedArrays);
+  return mergedArrays;
 };
 
+const mergeLocalizedValue = (masterOption: any, option: any): any => {
+  if (debugMode) console.log('Debug: Merging localizedValue, masterOption',masterOption);
+  if (debugMode) console.log('Debug: With localizedValue option',option);
+  if (typeof option === 'object' && option["@type"] === "@builder.io/core:LocalizedValue") {
+    if (masterOption?.Default !== option?.Default) {
+      return masterOption;
+    }else{
+      return option;
+    }
+  }
+  return option;
+};
+
+const mergeComponentOptions = (masterOptions: any, options: any): any => {
+
+  if (options && masterOptions){
+    Object.keys(options).forEach((key) => {
+
+      if (options[key] === 'undefined' || typeof options[key] === "undefined" || options[key] === null ||
+        key.endsWith('_masterSnapshot') || excludedProperties.includes(key) ||
+        masterOptions[key] === 'undefined' || typeof masterOptions[key] === "undefined" || masterOptions[key] === null
+      ) return;
+
+      if (Array.isArray(options[key])) {
+
+        const snapshotKey = `${key}_masterSnapshot`;
+        const snapshot = options[snapshotKey];
+
+        options[key] = mergeArrays(masterOptions[key], options[key], snapshot);
+        options[snapshotKey] = getArrayStructureSnapshot(masterOptions[key]);
+
+        options[key].forEach((element:any) => {
+          if (debugMode) console.log(`Debug: Traversing element ${key}`,element);
+            const masterOptionsById = masterOptions[key].find((item: { id: any; }) =>
+              item.id === element?.id
+            );
+            if (masterOptionsById){
+              if (debugMode) console.log('Debug: Join traverse with corresponding master element',masterOptionsById);
+              options[key][element] = mergeComponentOptions(masterOptionsById, element);
+            }else{
+              if (debugMode) console.log('Debug: Skipping traverse, no correlated master');
+            }
+        });
+
+      }else if(typeof options[key] === 'object'){
+
+        if (options[key] && options[key]["@type"] === "@builder.io/core:LocalizedValue") {
+          if (masterOptions[key]){
+            options[key] = mergeLocalizedValue(masterOptions[key], options[key]);
+          }
+        }else{
+          options[key] = mergeComponentOptions(masterOptions[key], options[key]);
+        }
+
+      }else {
+
+        const snapshotKey = `${key}_masterSnapshot`;
+        if (debugMode) console.log(`Debug: Merging ${key}`, options[snapshotKey]);
+
+        if (!options[snapshotKey] || masterOptions[key] !== options[snapshotKey]){
+          if (debugMode) console.log(`Debug: Updating ${key}`,masterOptions[key]);
+          options[key] = masterOptions[key];
+          options[snapshotKey]= masterOptions[key]
+        }
+      }
+
+    });
+  }
+
+  return options;
+};
 
 export const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): BuilderElement[] => {
-  const masterMap = new Map<string, any>();
-
   try {
-    master.forEach((masterBlock) => {
-      if (!masterBlock?.component?.options) {
-        return;
-      }
+    let mergedBlocks = mergeArrays(master,child,false);
 
-      if (masterBlock.component.options.uniqueId) {
-        masterMap.set(masterBlock.component.options.uniqueId, masterBlock);
-      }
+    mergedBlocks = mergedBlocks.map((mergedBlock) => {
+      const matchingMasterBlock = master.find((masterBlock) => masterBlock.id === mergedBlock.id);
+      if (matchingMasterBlock) {
 
-      const flattenAndMap = (obj: any) => {
-        if (Array.isArray(obj)) {
-          obj.forEach((item) => {
-            if (item.uniqueId) {
-              masterMap.set(item.uniqueId, item);
-            }
-            flattenAndMap(item);
-          });
-        } else if (typeof obj === 'object' && obj !== null) {
-          for (const key in obj) {
-            if (obj.hasOwnProperty(key) && !key.endsWith('_masterSnapshot') && !excludedProperties.includes(key)) {
-              flattenAndMap(obj[key]);
-            }
-          }
-        }
-      };
-
-      flattenAndMap(masterBlock.component.options);
-    });
-
-    let localizedMergedBlocks = child.map((childBlock) => {
-      const matchingMasterBlock = master.find((masterBlock) => masterBlock.id === childBlock.id);
-      if (matchingMasterBlock && matchingMasterBlock.component && matchingMasterBlock.component.options) {
-        const mergedOptions = mergeLocalizedValuesInBlocks(matchingMasterBlock.component.options, childBlock?.component?.options);
-
+        const mergedOptions = mergeComponentOptions(matchingMasterBlock.component?.options, mergedBlock?.component?.options);
         return {
-          ...childBlock,
+          ...mergedBlock,
           component: {
-            ...childBlock.component,
+            ...mergedBlock.component,
             options: mergedOptions,
           },
         } as BuilderElement;
+
       }
-      return childBlock;
+      return mergedBlock;
     });
-
-    master.forEach((masterBlock) => {
-      if (!localizedMergedBlocks.find((block) => block.id === masterBlock.id)) {
-        localizedMergedBlocks.push(masterBlock as BuilderElement);
-      }
-    });
-
-    const mergeArrays = (masterArray: any[], childArray: any[], snapshot: any, snapshotKey: string): any[] => {
-
-      console.log('childArray',childArray);
-
-      const childUniqueIds = new Set(childArray.map((childItem: any) => childItem.uniqueId));
-
-      const result = childArray.map((childItem: any) => {
-        if (childItem.uniqueId && masterMap.has(childItem.uniqueId)) {
-          return childItem;
-        }
-        if (!childItem.uniqueId){
-          return childItem;
-        }
-      });
-
-      masterArray.forEach((masterItem: any) => {
-        if (masterItem.uniqueId && !childUniqueIds.has(masterItem.uniqueId)) {
-          const lastMaster = snapshot ? JSON.parse(atob(snapshot)) : [];
-          const existsInLastMaster = lastMaster.some((snapshotItem: any) => snapshotItem.uniqueId === masterItem.uniqueId);
-
-          if (!existsInLastMaster) {
-            result.push(masterItem);
-          }
-        }
-      });
-      console.log('result of merging',result);
-      return result;
-    };
-
-    const mergeObjects = (masterObject: any, childObject: any): any => {
-
-      console.log('trying to merge',childObject);
-      const mergedObject = { ...childObject };
-
-      Object.keys(childObject).forEach((key) => {
-        if (Array.isArray(childObject[key])) {
-          const masterArray = masterObject?.[key] || [];
-          const snapshotKey = `${key}_masterSnapshot`;
-          const snapshot = childObject[snapshotKey];
-          mergedObject[key] = mergeArrays(masterArray, childObject[key], snapshot, snapshotKey);
-          mergedObject[snapshotKey] = btoa(JSON.stringify(mergedObject[key]));
-        } else if (typeof childObject[key] === 'object' && childObject[key] !== null) {
-          const snapshotKey = `${key}_masterSnapshot`;
-          const snapshot = childObject[snapshotKey];
-
-          if (snapshot && masterObject[snapshotKey]) {
-            if (childObject[snapshotKey] !== masterObject[snapshotKey]){
-              if (childObject[key]["@type"]){
-                if (childObject[key].Default !== masterObject[key].Default){
-                  mergedObject[key] = masterObject[key];
-                }
-              }
-            }else{
-              mergedObject[key] = childObject[key];
-            }
-          }
-        } else if (typeof childObject[key] !== 'undefined' && !Array.isArray(childObject[key]) && !key.endsWith('_masterSnapshot') && !excludedProperties.includes(key)) {
-          const snapshotKey = `${key}_masterSnapshot`;
-          const snapshot = childObject[snapshotKey];
-
-          if (snapshot) {
-            const decodedSnapshot = JSON.parse(atob(snapshot));
-            if (masterObject[key] !== decodedSnapshot) {
-              mergedObject[key] = masterObject?.[key];
-              mergedObject[snapshotKey] = btoa(JSON.stringify(masterObject[key]));
-            }
-          }
-        }
-      });
-
-      return mergedObject;
-    };
-
-    let mergedBlocks = child.map((childBlock) => {
-      const matchingMasterBlock = master.find((masterBlock) => masterBlock.id === childBlock.id);
-      if (matchingMasterBlock && matchingMasterBlock.component && matchingMasterBlock.component.options) {
-        const mergedOptions = mergeObjects(matchingMasterBlock.component.options, childBlock?.component?.options);
-
-        return {
-          ...childBlock,
-          component: {
-            ...childBlock.component,
-            options: mergedOptions,
-          },
-        } as BuilderElement;
-      }
-      return childBlock;
-    });
-
-    master.forEach((masterBlock) => {
-      if (!mergedBlocks.find((block) => block.id === masterBlock.id)) {
-        mergedBlocks.push(masterBlock as BuilderElement);
-      }
-    });
-
-    const updateOptionsWithSnapshots = (updatedOptions: any, masterOptions: any): any => {
-      const newOptions = { ...updatedOptions };
-
-      Object.keys(newOptions).forEach((key) => {
-        const snapshotKey = `${key}_masterSnapshot`;
-        const snapshot = newOptions[snapshotKey];
-
-        if (Array.isArray(newOptions[key])) {
-
-          newOptions[key] = newOptions[key].map((item: any, index: number) => {
-            if (typeof item === 'object' && item !== null) {
-              return updateOptionsWithSnapshots(item, masterOptions?.[key]?.[index]);
-            }
-            return item;
-          });
-
-          const masterSnapshot = btoa(JSON.stringify(masterOptions?.[key]));
-          newOptions[snapshotKey] = masterSnapshot;
-
-        } else if (typeof newOptions[key] === 'object' && newOptions[key] !== null) {
-          if (snapshot) {
-            const decodedSnapshot = JSON.parse(atob(snapshot));
-            if (JSON.stringify(newOptions[key]) === JSON.stringify(decodedSnapshot)) {
-              if (masterOptions?.[key]){
-                newOptions[key] = masterOptions?.[key];
-              }
-            } else {
-              newOptions[key] = updateOptionsWithSnapshots(newOptions[key], masterOptions?.[key]);
-            }
-          } else {
-            newOptions[key] = updateOptionsWithSnapshots(newOptions[key], masterOptions?.[key]);
-          }
-
-        } else if (!key.endsWith('_masterSnapshot') && !excludedProperties.includes(key)) {
-          if (snapshot) {
-            const decodedSnapshot = JSON.parse(atob(snapshot));
-            if (newOptions[key] === decodedSnapshot) {
-              newOptions[key] = masterOptions?.[key];
-            }
-          }
-
-          if (masterOptions && masterOptions.hasOwnProperty(key)) {
-            newOptions[snapshotKey] = btoa(JSON.stringify(masterOptions[key]));
-          }
-        }
-      });
-
-      return newOptions;
-    };
-
-    mergedBlocks = mergedBlocks.map((block) => {
-      const matchingMasterBlock = master.find((masterBlock) => masterBlock.id === block.id);
-      if (matchingMasterBlock && matchingMasterBlock.component && matchingMasterBlock.component.options) {
-        if (block.component && block.component.options) {
-          const updatedOptions = updateOptionsWithSnapshots({ ...block.component.options }, matchingMasterBlock.component.options);
-
-          return {
-            ...block,
-            component: {
-              ...block.component,
-              options: updatedOptions,
-            },
-          } as BuilderElement;
-        }
-      }
-      return block;
-    });
-
-    mergedBlocks = correctComponentPositions(master, child, mergedBlocks);
-
     return mergedBlocks;
   } catch (error) {
     console.error('Error in mergeBlocks function:', error);

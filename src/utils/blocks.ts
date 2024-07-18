@@ -86,67 +86,55 @@ export const addUniqueIdsInBlocks = (obj: any): any => {
 
 const mergeArrays = (masterArray: any[], childArray: any[], snapshot: any): any[] => {
 
-  if (!masterArray || !childArray) {
+  if (!masterArray || !childArray){
     return childArray;
   }
 
   let mergedArrays:any = [];
-  let childIds = new Set(childArray.map(item => item.id));
 
-  if (debugMode) console.log('Debug: Merging Components, child', childArray);
-  if (debugMode) console.log('Debug: Merging Components, master', masterArray);
+  if (debugMode) console.log('Debug: Merging, childArray',childArray);
+  if (debugMode) console.log('Debug: With, masterArray',masterArray);
 
-  // Step 1: Create a map for Master array positions
-  let masterPositions:any = {};
-  masterArray.forEach((masterItem, index) => {
-    if (masterItem && masterItem.id) {
-      masterPositions[masterItem.id] = index;
-    }
-  });
+  // Child & Common Elements
+  childArray.forEach((childItem: any) => {
+    if (childItem && typeof childItem !== undefined){
 
-  // Step 2: Traverse the Master array and add elements to the merged array
-  masterArray.forEach((masterItem) => {
-    if (masterItem && typeof masterItem !== undefined) {
-      if (masterItem.id) {
-        // If the item is in the childArray and should remain
-        if (childArray.some(item => item.id === masterItem.id)) {
-          let childItem = childArray.find(item => item.id === masterItem.id);
-          if (debugMode) console.log(`Debug: Added item (available on master & child) ${childItem.id}`, childItem);
-          mergedArrays.push(childItem);
-        }
-        // If the item is not in the childArray but is in the masterArray
-        else if (!childIds.has(masterItem.id)) {
-          if (snapshot) {
-            if (!snapshot.some((item: { id: any; }) => item.id === masterItem.id)) {
-              if (debugMode) console.log('Debug: Added new Element to List', masterItem);
-              mergedArrays.push(masterItem);
-            }
-          } else {
-            if (debugMode) console.log('Debug: Added new Element to List', masterItem);
-            mergedArrays.push(masterItem);
-          }
-        }
-      }
-    }
-  });
-
-  // Step 3: Add child elements that are not in the masterArray or have been specifically added by the child
-  childArray.forEach((childItem) => {
-    if (childItem && typeof childItem !== undefined) {
-      if (!masterArray.some(item => item.id === childItem.id)) {
-        if (debugMode) console.log('Debug: Added child element (created on child)', childItem);
+      if (childItem.id && masterArray.some(item => item.id === childItem.id)) {
+        if (debugMode) console.log(`Debug: Added item (available on master & child) ${childItem.id}`,childItem)
         mergedArrays.push(childItem);
       }
-      if (snapshot && childItem.id && !masterArray.some(item => item.id === childItem.id)) {
-        if (snapshot.some((item: { id: any; }) => item.id === childItem.id)) {
-          if (debugMode) console.log(`Debug: Removed old element ${childItem.id}`, childItem);
-          mergedArrays = mergedArrays.filter((item: { id: any; }) => item.id !== childItem.id);
+      if (!childItem.id || !masterArray.some(item => item.id === childItem.id)){
+        if (debugMode) console.log('Debug: Added child element (created on child)',childItem)
+        mergedArrays.push(childItem);
+      }
+
+      if (snapshot && childItem.id && !masterArray.some(item => item.id === childItem.id)){
+        if (debugMode) console.log(`Debug: Removed old element ${childItem.id}`,childItem)
+        mergedArrays = mergedArrays.filter((item: { id: any; }) => item.id !== childItem.id);
+      }
+
+    }
+
+  });
+
+  masterArray.forEach((masterItem: any) => {
+    if (masterItem && typeof masterItem !== undefined){
+      if (masterItem.id && !childArray.some(item => item.id === masterItem.id)) {
+        if (snapshot) {
+          if (!snapshot.some((item: { id: any; }) => item.id === masterItem.id)){
+            if (debugMode) console.log('Debug: Added new Element to List',masterItem)
+            mergedArrays.push(masterItem);
+          }
+        }else{
+          if (debugMode) console.log('Debug: Added new Element to List',masterItem)
+          mergedArrays.push(masterItem);
         }
       }
     }
+
   });
 
-  if (debugMode) console.log('Debug: Arrays after merging', mergedArrays);
+  if(debugMode) console.log('Debug: Arrays after merging',mergedArrays);
   return mergedArrays;
 };
 

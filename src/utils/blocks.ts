@@ -220,11 +220,15 @@ const mergeLocalizedValue = (masterOption: any, option: any): any => {
   if (debugMode) console.log('Debug: Merging localizedValue, masterOption',masterOption);
   if (debugMode) console.log('Debug: With localizedValue option',option);
   if (typeof option === 'object' && option["@type"] === "@builder.io/core:LocalizedValue") {
-    if (masterOption?.Default !== option?.Default) {
-      return masterOption;
-    }else{
-      return option;
+
+    if (masterOption["@type"]){
+      if (masterOption?.Default !== option?.Default) {
+        return masterOption;
+      }else{
+        return option;
+      }
     }
+
   }
   return option;
 };

@@ -13,13 +13,18 @@ export async function repush(childId: string, privateKey: string, apiKey: string
   try {
 
     const master = fastClone(appState?.designerState?.editingContentModel);
+
+    if (!master?.data?.blocksString){
+      alert('Latest changes are being saved at the moment. Please Try again');
+      console.error('Master blocks are not available at the moment:', master);
+    }
     let masterBlocks = JSON.parse(master?.data?.blocksString).filter((block: any) => !block?.id.includes('pixel'));
 
     const childResponse = await fetch(`https://cdn.builder.io/api/v3/content/${modelName}/${childId}?apiKey=${apiKey}&cachebust=true&includeUnpublished=true&cacheSeconds=1`);
     if (!childResponse){
       throw new Error('Error in repush: Problem with getting child response from api.');
     }
-
+    
     const child = await childResponse.json();
     const childBlocks = child?.data?.blocks?.filter((block: any) => !block?.id.includes('pixel'));
     const childLocale = getLocaleFromPage(child);
@@ -32,7 +37,6 @@ export async function repush(childId: string, privateKey: string, apiKey: string
     let resultBlocks: any = mergeBlocks(masterBlocks, childBlocks, snapshot);
     resultBlocks = duplicateDefaultValuesToLocaleValues(resultBlocks, childLocale);
 
-    if (debugMode) console.log('Debug: child', childResponse);
     if (debugMode) console.log('Debug: child', child);
     if (debugMode) console.log('Debug: childLocale', childLocale);
     if (debugMode) console.log('Debug: childBlocks', childBlocks);

@@ -265,18 +265,36 @@ const mergeComponentOptions = (masterOptions: any, options: any): any => {
           if (masterOptions[key]){
             options[key] = mergeLocalizedValue(masterOptions[key], options[key]);
           }
+        }else if (options[key] && options[key]['linkData']){
+          if (masterOptions[key]){
+
+            if (debugMode) console.log(`Debug: Merging Links in ${key}, childOptions`, options[key]);
+            if (debugMode) console.log(`Debug: With, masterOptions`, masterOptions[key]);
+            if (debugMode) console.log('Debug: Snapshot',options[`${key}_masterSnapshot`]);
+
+            if (!options[`${key}_masterSnapshot`] ||
+              options[`${key}_masterSnapshot`] !== masterOptions[key]['resolvedUrl']){
+
+              options[key] = masterOptions[key];
+              options[`${key}_masterSnapshot`] = masterOptions[key]['resolvedUrl'];
+              if (debugMode) console.log(`Debug: Options Key after change in ${key}`,options[key]);
+
+            }
+          }
         }else{
           options[key] = mergeComponentOptions(masterOptions[key], options[key]);
         }
 
       }else {
 
+        if (debugMode) console.log(`Debug: Merging ${key}`, options[key]);
         const snapshotKey = `${key}_masterSnapshot`;
-        if (debugMode) console.log(`Debug: Merging ${key}`, options[snapshotKey]);
         if (!options[snapshotKey] || masterOptions[key] !== options[snapshotKey]){
+
           if (debugMode) console.log(`Debug: Updating ${key}`,masterOptions[key]);
           options[key] = masterOptions[key];
           options[snapshotKey]= masterOptions[key]
+
         }
 
       }

@@ -3,13 +3,13 @@ Functions:
 
  Exported:
   addUniqueIdsInBlocks
+  getArrayStructureSnapshot
   mergeBlocks
 
  Internal:
   mergeArrays
   mergeLocalizedValue
   mergeComponentOptions
-  getArrayStructureSnapshot
   getId
 
  */
@@ -23,7 +23,7 @@ const getUniqueId = (): string => {
   return 'id-' + Math.random().toString(36).substr(2, 16);
 };
 
-const getArrayStructureSnapshot = (fullArray: any[]): any => {
+export const getArrayStructureSnapshot = (fullArray: any[]): any => {
   const snapshotArray = fullArray.map(item => ({ id: item.id })) || [];
   return snapshotArray;
 };
@@ -86,55 +86,140 @@ export const addUniqueIdsInBlocks = (obj: any): any => {
 
 const mergeArrays = (masterArray: any[], childArray: any[], snapshot: any): any[] => {
 
-  if (!masterArray || !childArray){
+  if (!masterArray || !childArray) {
+    return childArray;
+  }
+
+  let mergedArrays:any = [];
+  let childIds = new Set(childArray.map(item => item.id));
+
+  if (debugMode) console.log('Debug: Merging Components, child', childArray);
+  if (debugMode) console.log('Debug: Merging Components, master', masterArray);
+
+  // Step 1: Create a map for Master array positions
+  let masterPositions:any = {};
+  masterArray.forEach((masterItem, index) => {
+    if (masterItem && masterItem.id) {
+      masterPositions[masterItem.id] = index;
+    }
+  });
+
+  // Step 2: Traverse the Master array and add elements to the merged array
+  masterArray.forEach((masterItem) => {
+    if (masterItem && typeof masterItem !== undefined) {
+      if (masterItem.id) {
+        // If the item is in the childArray and should remain
+        if (childArray.some(item => item.id === masterItem.id)) {
+          let childItem = childArray.find(item => item.id === masterItem.id);
+          if (debugMode) console.log(`Debug: Added item (available on master & child) ${childItem.id}`, childItem);
+          mergedArrays.push(childItem);
+        }
+        // If the item is not in the childArray but is in the masterArray
+        else if (!childIds.has(masterItem.id)) {
+          if (snapshot) {
+            if (!snapshot.some((item: { id: any; }) => item.id === masterItem.id)) {
+              if (debugMode) console.log('Debug: Added new Element to List', masterItem);
+              mergedArrays.push(masterItem);
+            }
+          } else {
+            if (debugMode) console.log('Debug: Added new Element to List', masterItem);
+            mergedArrays.push(masterItem);
+          }
+        }
+      }
+    }
+  });
+
+  // Step 3: Add child elements that are not in the masterArray or have been specifically added by the child
+  childArray.forEach((childItem) => {
+    if (childItem && typeof childItem !== undefined) {
+      if (!masterArray.some(item => item.id === childItem.id)) {
+        if (debugMode) console.log('Debug: Added child element (created on child)', childItem);
+        mergedArrays.push(childItem);
+      }
+      if (snapshot && childItem.id && !masterArray.some(item => item.id === childItem.id)) {
+        if (snapshot.some((item: { id: any; }) => item.id === childItem.id)) {
+          if (debugMode) console.log(`Debug: Removed old element ${childItem.id}`, childItem);
+          mergedArrays = mergedArrays.filter((item: { id: any; }) => item.id !== childItem.id);
+        }
+      }
+    }
+  });
+
+  if (debugMode) console.log('Debug: Arrays after merging', mergedArrays);
+  return mergedArrays;
+};
+
+const mergeComponents = (masterArray: any[], childArray: BuilderElement[] | { id: any; }[], snapshot: any) => {
+  if (!masterArray || !childArray) {
     return childArray;
   }
 
   let mergedArrays:any = [];
 
-  if (debugMode) console.log('Debug: Merging, childArray',childArray);
-  if (debugMode) console.log('Debug: With, masterArray',masterArray);
+  if (debugMode) console.log('Debug: Merging Arrays, child', childArray);
+  if (debugMode) console.log('Debug: Merging Arrays, master', masterArray);
 
-  // Child & Common Elements
-  childArray.forEach((childItem: any) => {
-    if (childItem && typeof childItem !== undefined){
-
-      if (childItem.id && masterArray.some(item => item.id === childItem.id)) {
-        if (debugMode) console.log(`Debug: Added item (available on master & child) ${childItem.id}`,childItem)
-        mergedArrays.push(childItem);
-      }
-      if (!childItem.id || !masterArray.some(item => item.id === childItem.id)){
-        if (debugMode) console.log('Debug: Added child element (created on child)',childItem)
-        mergedArrays.push(childItem);
-      }
-
-      if (snapshot && childItem.id && !masterArray.some(item => item.id === childItem.id)){
-        if (debugMode) console.log(`Debug: Removed old element ${childItem.id}`,childItem)
-        mergedArrays = mergedArrays.filter((item: { id: any; }) => item.id !== childItem.id);
-      }
-
+  let masterPositions:any = {};
+  masterArray.forEach((masterItem, index) => {
+    if (masterItem && masterItem.id) {
+      masterPositions[masterItem.id] = index;
     }
-
   });
 
-  masterArray.forEach((masterItem: any) => {
-    if (masterItem && typeof masterItem !== undefined){
-      if (masterItem.id && !childArray.some(item => item.id === masterItem.id)) {
-        if (snapshot) {
-          if (!snapshot.some((item: { id: any; }) => item.id === masterItem.id)){
-            if (debugMode) console.log('Debug: Added new Element to List',masterItem)
+  let masterIndex = 0;
+  childArray.forEach((childItem: any) => {
+    if (childItem && typeof childItem !== undefined) {
+      while (masterIndex < masterArray.length && (!childItem.id || masterPositions[masterArray[masterIndex].id] < masterPositions[childItem.id])) {
+        let masterItem = masterArray[masterIndex];
+        if (masterItem && !childArray.some((item:any) => item.id === masterItem.id)) {
+          if (snapshot) {
+            if (!snapshot.some((item:any) => item.id === masterItem.id)) {
+              if (debugMode) console.log('Debug: Added new Element to List', masterItem);
+              mergedArrays.push(masterItem);
+            }
+          } else {
+            if (debugMode) console.log('Debug: Added new Element to List', masterItem);
             mergedArrays.push(masterItem);
           }
-        }else{
-          if (debugMode) console.log('Debug: Added new Element to List',masterItem)
-          mergedArrays.push(masterItem);
+        }
+        masterIndex++;
+      }
+
+      if (childItem.id && masterArray.some(item => item.id === childItem.id)) {
+        if (debugMode) console.log(`Debug: Added item (available on master & child) ${childItem.id}`, childItem);
+        mergedArrays.push(childItem);
+      } else if (!childItem.id || !masterArray.some(item => item.id === childItem.id)) {
+        if (debugMode) console.log('Debug: Added child element (created on child)', childItem);
+        mergedArrays.push(childItem);
+      }
+
+      if (snapshot && childItem.id && !masterArray.some(item => item.id === childItem.id)) {
+        if (snapshot.some((item: { id: any; }) => item.id === childItem.id)) {
+          if (debugMode) console.log(`Debug: Removed old element ${childItem.id}`, childItem);
+          mergedArrays = mergedArrays.filter((item: { id: any; }) => item.id !== childItem.id);
         }
       }
     }
-
   });
 
-  if(debugMode) console.log('Debug: Arrays after merging',mergedArrays);
+  while (masterIndex < masterArray.length) {
+    let masterItem = masterArray[masterIndex];
+    if (masterItem && !childArray.some((item:any) => item.id === masterItem.id)) {
+      if (snapshot) {
+        if (!snapshot.some((item: { id: any; }) => item.id === masterItem.id)) {
+          if (debugMode) console.log('Debug: Added new Element to List', masterItem);
+          mergedArrays.push(masterItem);
+        }
+      } else {
+        if (debugMode) console.log('Debug: Added new Element to List', masterItem);
+        mergedArrays.push(masterItem);
+      }
+    }
+    masterIndex++;
+  }
+
+  if (debugMode) console.log('Debug: Arrays after merging', mergedArrays);
   return mergedArrays;
 };
 
@@ -210,11 +295,13 @@ const mergeComponentOptions = (masterOptions: any, options: any): any => {
   return options;
 };
 
-export const mergeBlocks = (master: BuilderElement[], child: BuilderElement[]): BuilderElement[] => {
+export const mergeBlocks = (master: BuilderElement[], child: BuilderElement[], snapshot = false): BuilderElement[] => {
   try {
-    let mergedBlocks = mergeArrays(master,child,false);
+    if (debugMode) console.log('Debug: Before Merging Components, snapshot', snapshot);
+    let mergedBlocks = mergeComponents(master,child,snapshot);
+    if (debugMode) console.log('Debug: After Merging Components, mergedBlocks', mergedBlocks);
 
-    mergedBlocks = mergedBlocks.map((mergedBlock) => {
+    mergedBlocks = mergedBlocks.map((mergedBlock: BuilderElement) => {
       const matchingMasterBlock = master.find((masterBlock) => masterBlock.id === mergedBlock.id);
       if (matchingMasterBlock) {
 

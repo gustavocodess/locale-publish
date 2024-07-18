@@ -1,6 +1,6 @@
 import appState from '@builder.io/app-context';
 import { getLocaleFromPage, duplicateDefaultValuesToLocaleValues } from '../utils/locales';
-import { addUniqueIdsInBlocks, mergeBlocks } from "../utils/blocks";
+import { mergeBlocks, getArrayStructureSnapshot, addUniqueIdsInBlocks } from "../utils/blocks";
 import { pushBlocks, updateChildren } from "../locale-service";
 import { debugMode } from "../utils/consts";
 
@@ -20,10 +20,12 @@ export async function repush(childId: string, privateKey: string, apiKey: string
     const childBlocks = child?.data?.blocks?.filter((block: any) => !block?.id.includes('pixel'));
     const childLocale = getLocaleFromPage(child);
 
+    const snapshot = child?.data?.blocks_masterSnapshot ? child?.data?.blocks_masterSnapshot : false;
+
     masterBlocks = addUniqueIdsInBlocks(masterBlocks);
     await pushBlocks(master?.id, modelName, masterBlocks, privateKey);
 
-    let resultBlocks: any = mergeBlocks(masterBlocks, childBlocks);
+    let resultBlocks: any = mergeBlocks(masterBlocks, childBlocks, snapshot);
     resultBlocks = duplicateDefaultValuesToLocaleValues(resultBlocks, childLocale);
 
     if (debugMode) console.log('Debug: child', child);
@@ -37,6 +39,8 @@ export async function repush(childId: string, privateKey: string, apiKey: string
     }
 
     const childData: any = { ...child?.data };
+    childData.blocks_masterSnapshot = getArrayStructureSnapshot(masterBlocks);
+
     const result = await updateChildren(childId, privateKey, resultBlocks, modelName, childData);
 
     return result;

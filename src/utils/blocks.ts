@@ -2,15 +2,17 @@
 Functions:
 
  Exported:
+  mergeBlocks
   addUniqueIdsInBlocks
   getArrayStructureSnapshot
-  mergeBlocks
 
  Internal:
+  mergeComponents
+  mergeComponentOptions
   mergeArrays
   mergeLocalizedValue
-  mergeComponentOptions
-  getId
+
+  getUniqueId
 
  */
 
@@ -89,16 +91,25 @@ const mergeArrays = (masterArray: any[], childArray: any[], snapshot: any): any[
   if (!masterArray || !childArray){
     return childArray;
   }
-
   let mergedArrays:any = [];
 
   if (debugMode) console.log('Debug: Merging, childArray',childArray);
   if (debugMode) console.log('Debug: With, masterArray',masterArray);
 
-  // Child & Common Elements
+  let copyOnAddIds = new Set();
+  childArray.filter((childItem: any) => {
+    if (childItem && childItem.id) {
+      if (copyOnAddIds.has(childItem.id)) {
+        if (debugMode) console.log(`Debug: Removing Item with duplicated ID (${childItem.id} due to copyOnAdd field`);
+        delete childItem.id;
+      }else{
+        copyOnAddIds.add(childItem.id);
+      }
+    }
+  });
+
   childArray.forEach((childItem: any) => {
     if (childItem && typeof childItem !== undefined){
-
       if (childItem.id && masterArray.some(item => item.id === childItem.id)) {
         if (debugMode) console.log(`Debug: Added item (available on master & child) ${childItem.id}`,childItem)
         mergedArrays.push(childItem);
@@ -112,9 +123,7 @@ const mergeArrays = (masterArray: any[], childArray: any[], snapshot: any): any[
         if (debugMode) console.log(`Debug: Removed old element ${childItem.id}`,childItem)
         mergedArrays = mergedArrays.filter((item: { id: any; }) => item.id !== childItem.id);
       }
-
     }
-
   });
 
   masterArray.forEach((masterItem: any) => {
@@ -131,7 +140,6 @@ const mergeArrays = (masterArray: any[], childArray: any[], snapshot: any): any[
         }
       }
     }
-
   });
 
   if(debugMode) console.log('Debug: Arrays after merging',mergedArrays);
@@ -142,7 +150,6 @@ const mergeComponents = (masterArray: any[], childArray: BuilderElement[] | { id
   if (!masterArray || !childArray) {
     return childArray;
   }
-
   let mergedArrays:any = [];
 
   if (debugMode) console.log('Debug: Merging Arrays, child', childArray);
@@ -173,7 +180,6 @@ const mergeComponents = (masterArray: any[], childArray: BuilderElement[] | { id
         }
         masterIndex++;
       }
-
       if (childItem.id && masterArray.some(item => item.id === childItem.id)) {
         if (debugMode) console.log(`Debug: Added item (available on master & child) ${childItem.id}`, childItem);
         mergedArrays.push(childItem);
@@ -181,7 +187,6 @@ const mergeComponents = (masterArray: any[], childArray: BuilderElement[] | { id
         if (debugMode) console.log('Debug: Added child element (created on child)', childItem);
         mergedArrays.push(childItem);
       }
-
       if (snapshot && childItem.id && !masterArray.some(item => item.id === childItem.id)) {
         if (snapshot.some((item: { id: any; }) => item.id === childItem.id)) {
           if (debugMode) console.log(`Debug: Removed old element ${childItem.id}`, childItem);
@@ -238,7 +243,6 @@ const mergeComponentOptions = (masterOptions: any, options: any): any => {
 
         const snapshotKey = `${key}_masterSnapshot`;
         const snapshot = options[snapshotKey];
-
         options[key] = mergeArrays(masterOptions[key], options[key], snapshot);
         options[snapshotKey] = getArrayStructureSnapshot(masterOptions[key]);
 
@@ -269,12 +273,12 @@ const mergeComponentOptions = (masterOptions: any, options: any): any => {
 
         const snapshotKey = `${key}_masterSnapshot`;
         if (debugMode) console.log(`Debug: Merging ${key}`, options[snapshotKey]);
-
         if (!options[snapshotKey] || masterOptions[key] !== options[snapshotKey]){
           if (debugMode) console.log(`Debug: Updating ${key}`,masterOptions[key]);
           options[key] = masterOptions[key];
           options[snapshotKey]= masterOptions[key]
         }
+
       }
 
     });
@@ -285,6 +289,7 @@ const mergeComponentOptions = (masterOptions: any, options: any): any => {
 
 export const mergeBlocks = (master: BuilderElement[], child: BuilderElement[], snapshot = false): BuilderElement[] => {
   try {
+
     if (debugMode) console.log('Debug: Before Merging Components, snapshot', snapshot);
     let mergedBlocks = mergeComponents(master,child,snapshot);
     if (debugMode) console.log('Debug: After Merging Components, mergedBlocks', mergedBlocks);
@@ -292,7 +297,6 @@ export const mergeBlocks = (master: BuilderElement[], child: BuilderElement[], s
     mergedBlocks = mergedBlocks.map((mergedBlock: BuilderElement) => {
       const matchingMasterBlock = master.find((masterBlock) => masterBlock.id === mergedBlock.id);
       if (matchingMasterBlock) {
-
         const mergedOptions = mergeComponentOptions(matchingMasterBlock.component?.options, mergedBlock?.component?.options);
         return {
           ...mergedBlock,
@@ -301,10 +305,10 @@ export const mergeBlocks = (master: BuilderElement[], child: BuilderElement[], s
             options: mergedOptions,
           },
         } as BuilderElement;
-
       }
       return mergedBlock;
     });
+
     return mergedBlocks;
   } catch (error) {
     console.error('Error in mergeBlocks function:', error);

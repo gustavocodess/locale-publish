@@ -145,7 +145,6 @@ registerPlugin(
         return isGlobal;
       },
       async onClick(content) {
-        appState.globalState.showGlobalBlockingLoading('Grabbing data...');
         const locale = appState.designerState?.activeLocale || 'Default';
         const modelName = content.modelName;
 
@@ -173,13 +172,13 @@ registerPlugin(
           return 
         }
         appState.globalState.showGlobalBlockingLoading(`Pushing for ${localesToPublish.join(' & ')} ....`);
-        const success = await pushToLocales(localesToPublish, fastClone(content), privateKey, modelName);
+        const errorLocales = await pushToLocales(localesToPublish, fastClone(content), privateKey, modelName);
 
-        if (success) {
+        if (!errorLocales.length) {
           appState.snackBar.show(`Pushed content to ${localesToPublish.join(' & ')}.`);
           // update parent with children references created
         } else {
-          appState.snackBar.show(`Some locales might have not be pushed. Contact Admin.`);
+          appState.snackBar.show(`Failed to push for ${errorLocales.join(', ')}. Contact Admin or retry for these locales.`);
         }
         appState.globalState.hideGlobalBlockingLoading();
         }

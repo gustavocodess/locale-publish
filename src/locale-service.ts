@@ -44,13 +44,18 @@ export async function updateChildren(
     delete newPayload.name
   }
 
-  let fetchUrl =  `https://builder.io/api/v1/write/${modelName}/${contentId}`
-  if (!isForce || published === 'published') {
-    fetchUrl+= '?autoSaveOnly=true'
-    newPayload.published = published
-    newPayload.modelId = modelId
-    newPayload.id = contentId
+  let fetchUrl =  `https://builder.io/api/v1/write/${modelName}/${contentId}?autoSaveOnly=true`
+  newPayload.published = published
+  newPayload.modelId = modelId
+  newPayload.id = contentId
+
+  if (isForce || published !== 'published') {
+    fetchUrl = `https://builder.io/api/v1/write/${modelName}/${contentId}`
+    delete newPayload.published
+    delete newPayload.modelId
+    delete newPayload.id
   }
+  console.log('url que usei ', fetchUrl, contentId)
   const res2 = await fetch(
     // ?autoSaveOnly=true
     fetchUrl,
@@ -67,6 +72,7 @@ export async function updateChildren(
 }
 
 export async function pushLocale(newContent: any, privateKey: string, modelName: string) {
+  delete newContent.modelId
   const result = await fetch(
     `https://builder.io/api/v1/write/${modelName}`,
     {

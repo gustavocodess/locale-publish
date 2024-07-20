@@ -1,7 +1,7 @@
 import traverse from "traverse";
 import appState from '@builder.io/app-context';
 import { pushBlocks, pushLocale, updateChildren } from "./locale-service";
-import { clearBlock, deepGet, deepSet, fastClone, getQueryLocales, localizeBlocks, localizeDataFromMaster, replaceAll, tagMasterBlockOptions } from "./plugin-helpers";
+import { clearBlock, deepGet, deepSet, executeInBatches, fastClone, getQueryLocales, localizeBlocks, localizeDataFromMaster, replaceAll, tagMasterBlockOptions } from "./plugin-helpers";
 import { findIndex } from "lodash";
 import { get } from "https";
 // @ts-
@@ -279,8 +279,9 @@ export async function repushSingleLocale(chidrenId: string, privateKey: string, 
 
 }
 
-export async function pushToLocales(localesToPublish: string[], cloneContent: any, privateKey: string, modelName: string) {
+export async function pushToLocales(localesToPublish: string[], cloneContent: any, privateKey: string, modelName: string): Promise<string[]> {
   const createdEntries: any[] = []
+  const errorLocales: string[] = []
   const currentLocaleTargets = getQueryLocales(appState?.designerState?.editingContentModel)
   let masterBlocks = (JSON.parse(cloneContent?.data?.blocksString)?? []).map((block: any) => ({...block, meta: {...block.meta, masterId: block.id}}));
 
@@ -292,7 +293,7 @@ export async function pushToLocales(localesToPublish: string[], cloneContent: an
   //   published, modelId, privateKey)
   const masterData = cloneContent?.data
 
-  const results = localesToPublish.map(async (locale: string) => {
+  const requests = localesToPublish.map(async (locale: string) => {
     let newBlocks = localizeBlocks(masterBlocks, locale, false)
     const newData = localizeDataFromMaster(masterData, locale)
     const localeTarget = {
@@ -330,15 +331,18 @@ export async function pushToLocales(localesToPublish: string[], cloneContent: an
     delete newContent.id;
 
     const result = await pushLocale(newContent, privateKey, modelName);
-    const entryCreated = await result.json();
-
-    createdEntries.push({id: entryCreated.id, target: localeTarget, name: entryCreated.name})
+    
+    if (result.ok) {
+      const entryCreated = await result.json();
+      createdEntries.push({id: entryCreated.id, target: localeTarget, name: entryCreated.name})
+    } else {
+      errorLocales.push(localeTarget.value[0])
+    }
     return result;
   })
 
-  const success = await Promise.all(results.map(p => p.catch(e => e)))
-  const validResults = success.filter(result => !(result instanceof Error));
-  // console.log('validResults ', validResults)
+  await executeInBatches(requests, 4, 1000)
+
   const newLocaleReferences = [
     ...masterData?.localeChildren?? [],
     ...createdEntries.map((item) => ({
@@ -350,7 +354,7 @@ export async function pushToLocales(localesToPublish: string[], cloneContent: an
   ]
   await updateParentWithReferences(newLocaleReferences, privateKey, modelName)
   // returns true if no errors happened on any calls
-  return validResults.length === localesToPublish.length;
+  return errorLocales
 
 }
 

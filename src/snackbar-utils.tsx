@@ -30,7 +30,6 @@ interface ElementProps {
 }
 
 const LocaleConfigurationEditor: React.FC<Props> = props => {
-  appState.globalState.showGlobalBlockingLoading('Fetching necessary data...');
   const store = useLocalStore(() => ({
     targetLangs: [] as string[],
     get availableLangs(): string[] {
@@ -43,7 +42,6 @@ const LocaleConfigurationEditor: React.FC<Props> = props => {
     sourceLang:
       appState.user.organization.value.customTargetingAttributes?.get('locale')?.toJSON().enum[0],
   }));
-
   return useObserver(() => (
     <div css={{ margin: 20 }}>
       <div css={{ marginTop: 8, marginBottom: 20 }}>

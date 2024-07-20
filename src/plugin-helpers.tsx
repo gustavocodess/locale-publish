@@ -262,3 +262,38 @@ export const clearBlock = (block: any, childrenBlocks: any, locale: string) => {
 export const replaceAll = (str: string, find: string, replace: string) => {
   return str.replace(new RegExp(find, 'g'), replace)
 }
+
+
+export async function runPromises(promises: Array<() => Promise<any>>): Promise<any[]> {
+  const results: any[] = [];
+  for (const promiseFunc of promises) {
+    try {
+      // Add artificial delay of 2 seconds before processing each promise
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      const result = await promiseFunc();
+      results.push(result);
+    } catch (error) {
+      // Stop processing if any promise fails and throw the error
+      throw error;
+    }
+  }
+  return results;
+}
+
+export async function executeInBatches(promises: Array<Promise<Response>>, batchSize: number, delay: number) {
+  const results = [];
+  try {
+    for (let i = 0; i < promises.length; i += batchSize) {
+      const batch = promises.slice(i, i + batchSize);
+      const batchResults = await Promise.all(batch);
+      results.push(...batchResults);
+      if (i + batchSize < promises.length) {
+          await new Promise(resolve => setTimeout(resolve, delay));
+      }
+  }
+  } catch (error) {
+    console.log('error ', error)
+    throw error;
+  }
+  return results;
+}
